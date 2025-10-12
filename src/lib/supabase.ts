@@ -1,43 +1,43 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-console.log('Supabase init:', {
-  url: supabaseUrl,
-  keyPrefix: supabaseAnonKey?.substring(0, 20),
-  keyLength: supabaseAnonKey?.length
-})
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
-    url: !!supabaseUrl,
-    key: !!supabaseAnonKey
-  })
-  throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in .env file')
+  throw new Error('Missing Supabase environment variables');
 }
 
-// Single client instance using anon key with auth
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
   },
-})
+});
 
-// Dashboard stats
-export async function getDashboardStats() {
+type DashboardStats = {
+  totalOrders: number;
+  todaysOrders: number;
+  totalCustomers: number;
+  totalAgents: number;
+  totalProducts: number;
+  activeProducts: number;
+  totalRevenue: number;
+  pendingOrders: number;
+  deliveredOrders: number;
+};
+
+export async function getDashboardStats(): Promise<DashboardStats> {
   try {
     const [orders, customers, agents, products] = await Promise.all([
-      supabase.from('orders').select('*'),
-      supabase.from('users').select('*').eq('role', 'customer'),
-      supabase.from('users').select('*').eq('role', 'delivery_agent'),
-      supabase.from('products').select('*')
-    ])
+      supabase.from('orders').select('status, total'),
+      supabase.from('users').select('id').eq('role', 'customer'),
+      supabase.from('users').select('id').eq('role', 'delivery_agent'),
+      supabase.from('products').select('id, is_active')
+    ]);
 
     const totalRevenue = orders.data
       ?.filter(o => o.status === 'delivered')
-      .reduce((sum, o) => sum + (parseFloat(o.order_total) || 0), 0) || 0
+      .reduce((sum, o) => sum + (Number(o.total) || 0), 0) || 0;
 
     return {
       totalOrders: orders.data?.length || 0,
@@ -49,9 +49,9 @@ export async function getDashboardStats() {
       totalRevenue,
       pendingOrders: orders.data?.filter(o => o.status === 'pending').length || 0,
       deliveredOrders: orders.data?.filter(o => o.status === 'delivered').length || 0
-    }
+    };
   } catch (error) {
-    console.error('Stats error:', error)
+    console.error('Stats error:', error);
     return {
       totalOrders: 0,
       todaysOrders: 0,
@@ -62,59 +62,57 @@ export async function getDashboardStats() {
       totalRevenue: 0,
       pendingOrders: 0,
       deliveredOrders: 0
-    }
+    };
   }
 }
 
-// Orders
 export async function fetchOrders() {
   const { data, error } = await supabase
     .from('orders')
     .select(`
       *,
-      customer:users!customer_id(*),
-      store:stores(*),
-      delivery_address:customer_addresses(*),
-      order_items(*, variant:product_variants(*, product:products(*))),
-      payments(*)
+      customer:users!customer_id(id, full_name, email),
+      store:stores(id, name),
+      delivery_agent:users!delivery_agent_id(id, full_name)
     `)
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
+    .order('created_at', { ascending: false });
+
+  return { data, error };
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
   const { data, error } = await supabase
     .from('orders')
-    .update({ status, status_updated_at: new Date().toISOString() })
+    .update({
+      status,
+      updated_at: new Date().toISOString()
+    })
     .eq('id', orderId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
 }
 
 export async function assignDeliveryAgent(orderId: string, agentId: string) {
   const { data, error } = await supabase
     .from('orders')
-    .update({ 
+    .update({
       delivery_agent_id: agentId,
-      status: 'assigned_delivery_partner',
-      status_updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString()
     })
     .eq('id', orderId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
 }
 
-// Products
 export async function fetchProducts() {
   const { data, error } = await supabase
     .from('products')
     .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
+    .order('created_at', { ascending: false });
+
+  return { data, error };
 }
 
 export async function fetchProductsWithDetails() {
@@ -122,12 +120,12 @@ export async function fetchProductsWithDetails() {
     .from('products')
     .select(`
       *,
-      category:categories(*),
+      category:categories(id, name),
       variants:product_variants(*)
     `)
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
+    .order('created_at', { ascending: false });
+
+  return { data, error };
 }
 
 export async function updateProductStatus(productId: string, isActive: boolean) {
@@ -135,9 +133,9 @@ export async function updateProductStatus(productId: string, isActive: boolean) 
     .from('products')
     .update({ is_active: isActive })
     .eq('id', productId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
 }
 
 export async function updateProductFeatured(productId: string, isFeatured: boolean) {
@@ -145,168 +143,500 @@ export async function updateProductFeatured(productId: string, isFeatured: boole
     .from('products')
     .update({ is_featured: isFeatured })
     .eq('id', productId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
 }
 
-export async function createProductWithVariants(productData: any) {
-  const { variants, ...product } = productData
-  
+export async function createProductWithVariants(productData: { variants?: any[]; [key: string]: any }) {
+  const { variants, ...product } = productData;
+
   const { data: productResult, error: productError } = await supabase
     .from('products')
     .insert(product)
     .select()
-    .single()
-  
-  if (productError) return { data: null, error: productError }
-  
+    .single();
+
+  if (productError) return { data: null, error: productError };
+
   if (variants && variants.length > 0) {
-    const variantsWithProductId = variants.map((variant: any) => ({
+    const variantsWithProductId = variants.map((variant) => ({
       ...variant,
       product_id: productResult.id
-    }))
-    
+    }));
+
     const { error: variantsError } = await supabase
       .from('product_variants')
-      .insert(variantsWithProductId)
-    
-    if (variantsError) return { data: null, error: variantsError }
+      .insert(variantsWithProductId);
+
+    if (variantsError) return { data: null, error: variantsError };
   }
-  
-  return { data: productResult, error: null }
+
+  return { data: productResult, error: null };
 }
 
-export async function updateProduct(productId: string, productData: any) {
+export async function updateProduct(productId: string, productData: Record<string, any>) {
   const { data, error } = await supabase
     .from('products')
     .update(productData)
     .eq('id', productId)
-    .select()
-  
-  return { data, error }
-}
+    .select();
 
-export async function updateProductVariant(variantId: string, variantData: any) {
-  const { data, error } = await supabase
-    .from('product_variants')
-    .update(variantData)
-    .eq('id', variantId)
-    .select()
-  
-  return { data, error }
-}
-
-export async function createProductVariant(variantData: any) {
-  const { data, error } = await supabase
-    .from('product_variants')
-    .insert(variantData)
-    .select()
-  
-  return { data, error }
-}
-
-export async function deleteProductVariant(variantId: string) {
-  const { data, error } = await supabase
-    .from('product_variants')
-    .delete()
-    .eq('id', variantId)
-  
-  return { data, error }
+  return { data, error };
 }
 
 export async function deleteProduct(productId: string) {
   const { data, error } = await supabase
     .from('products')
     .delete()
-    .eq('id', productId)
-  
-  return { data, error }
+    .eq('id', productId);
+
+  return { data, error };
 }
 
-// Categories
+export async function updateProductVariant(variantId: string, variantData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .update(variantData)
+    .eq('id', variantId)
+    .select();
+
+  return { data, error };
+}
+
+export async function createProductVariant(variantData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .insert(variantData)
+    .select();
+
+  return { data, error };
+}
+
+export async function deleteProductVariant(variantId: string) {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .delete()
+    .eq('id', variantId);
+
+  return { data, error };
+}
+
 export async function fetchCategories() {
   const { data, error } = await supabase
     .from('categories')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
+    .select('id, name, description, parent_id, image_url, is_active, display_order, created_at, updated_at')
+    .order('display_order', { ascending: true });
+
+  if (data && !error) {
+    return {
+      data: data.map(cat => ({
+        ...cat,
+        parent_category_id: cat.parent_id
+      })),
+      error
+    };
+  }
+
+  return { data, error };
 }
 
-export async function createCategory(categoryData: any) {
+export async function createCategory(categoryData: Record<string, any>) {
+  const { parent_category_id, ...dbData } = categoryData;
+  const insertData = {
+    ...dbData,
+    parent_id: parent_category_id || null
+  };
+
   const { data, error } = await supabase
     .from('categories')
-    .insert(categoryData)
-    .select()
-  
-  return { data, error }
+    .insert(insertData)
+    .select();
+
+  return { data, error };
 }
 
-export async function updateCategory(categoryId: string, categoryData: any) {
+export async function updateCategory(categoryId: string, categoryData: Record<string, any>) {
+  const { parent_category_id, ...dbData } = categoryData;
+  const updateData = {
+    ...dbData,
+    parent_id: parent_category_id || null
+  };
+
   const { data, error } = await supabase
     .from('categories')
-    .update(categoryData)
+    .update(updateData)
     .eq('id', categoryId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
 }
 
 export async function deleteCategory(categoryId: string) {
   const { data, error } = await supabase
     .from('categories')
     .delete()
-    .eq('id', categoryId)
-  
-  return { data, error }
+    .eq('id', categoryId);
+
+  return { data, error };
 }
 
-// Users
-export async function fetchUsers() {
+export async function fetchStores() {
   const { data, error } = await supabase
-    .from('users')
+    .from('stores')
     .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
+    .order('created_at', { ascending: false });
+
+  return { data, error };
 }
 
-export async function updateUserStatus(userId: string, isActive: boolean) {
+export async function createStore(storeData: Record<string, any>) {
   const { data, error } = await supabase
-    .from('users')
-    .update({ is_active: isActive })
-    .eq('id', userId)
-    .select()
-  
-  return { data, error }
+    .from('stores')
+    .insert(storeData)
+    .select();
+
+  return { data, error };
 }
 
-// Delivery Agents
+export async function updateStore(storeId: string, storeData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('stores')
+    .update(storeData)
+    .eq('id', storeId)
+    .select();
+
+  return { data, error };
+}
+
+export async function deleteStore(storeId: string) {
+  const { data, error } = await supabase
+    .from('stores')
+    .delete()
+    .eq('id', storeId);
+
+  return { data, error };
+}
+
+export async function fetchInventory() {
+  const { data, error } = await supabase
+    .from('store_inventory')
+    .select(`
+      *,
+      product:products(id, name, sku),
+      variant:product_variants(id, name),
+      store:stores(id, name)
+    `)
+    .order('updated_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function fetchProductVariants() {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .select(`
+      *,
+      product:products(id, name, sku)
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function fetchBulkInventory() {
+  const { data, error } = await supabase
+    .from('bulk_inventory')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function fetchPurchaseRecords() {
+  const { data, error } = await supabase
+    .from('purchase_records')
+    .select(`
+      *,
+      store:stores(id, name),
+      product:products(id, name)
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function createPurchaseRecord(purchaseData: Record<string, any>) {
+  const batchNumber = `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
+  const { data, error } = await supabase
+    .from('purchase_records')
+    .insert({
+      ...purchaseData,
+      batch_number: batchNumber,
+      remaining_quantity: purchaseData.quantity
+    })
+    .select();
+
+  return { data, error };
+}
+
+export async function updatePurchaseRecord(recordId: string, purchaseData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('purchase_records')
+    .update(purchaseData)
+    .eq('id', recordId)
+    .select();
+
+  return { data, error };
+}
+
+export async function deletePurchaseRecord(recordId: string) {
+  const { data, error } = await supabase
+    .from('purchase_records')
+    .delete()
+    .eq('id', recordId);
+
+  return { data, error };
+}
+
+export async function fetchInventoryAdjustments() {
+  const { data, error } = await supabase
+    .from('inventory_adjustments')
+    .select(`
+      *,
+      store:stores(id, name),
+      product:products(id, name),
+      adjusted_by_user:users!adjusted_by(id, full_name)
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function createInventoryAdjustment(adjustmentData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('inventory_adjustments')
+    .insert(adjustmentData)
+    .select();
+
+  return { data, error };
+}
+
+export async function updateInventoryAdjustment(adjustmentId: string, adjustmentData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('inventory_adjustments')
+    .update(adjustmentData)
+    .eq('id', adjustmentId)
+    .select();
+
+  return { data, error };
+}
+
+export async function deleteInventoryAdjustment(adjustmentId: string) {
+  const { data, error } = await supabase
+    .from('inventory_adjustments')
+    .delete()
+    .eq('id', adjustmentId);
+
+  return { data, error };
+}
+
+export async function fetchPayments() {
+  const { data, error } = await supabase
+    .from('payments')
+    .select(`
+      *,
+      order:orders(id, order_number, customer:users!customer_id(id, full_name))
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function fetchRefunds() {
+  const { data, error } = await supabase
+    .from('refunds')
+    .select(`
+      *,
+      order:orders(id, order_number),
+      payment:payments(id, transaction_id)
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function createRefund(refundData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('refunds')
+    .insert(refundData)
+    .select();
+
+  return { data, error };
+}
+
+export async function updateRefundStatus(refundId: string, status: string, processedBy?: string) {
+  const updateData: Record<string, any> = {
+    status,
+    updated_at: new Date().toISOString()
+  };
+
+  if (processedBy) {
+    updateData.processed_by = processedBy;
+  }
+
+  const { data, error } = await supabase
+    .from('refunds')
+    .update(updateData)
+    .eq('id', refundId)
+    .select();
+
+  return { data, error };
+}
+
+export async function fetchCoupons() {
+  const { data, error } = await supabase
+    .from('coupons')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function createCoupon(couponData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('coupons')
+    .insert(couponData)
+    .select();
+
+  return { data, error };
+}
+
+export async function updateCoupon(couponId: string, couponData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('coupons')
+    .update(couponData)
+    .eq('id', couponId)
+    .select();
+
+  return { data, error };
+}
+
+export async function deleteCoupon(couponId: string) {
+  const { data, error } = await supabase
+    .from('coupons')
+    .delete()
+    .eq('id', couponId);
+
+  return { data, error };
+}
+
+export async function fetchBanners() {
+  const { data, error } = await supabase
+    .from('promotional_banners')
+    .select('*')
+    .order('display_order', { ascending: true });
+
+  return { data, error };
+}
+
+export async function createBanner(bannerData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('promotional_banners')
+    .insert(bannerData)
+    .select();
+
+  return { data, error };
+}
+
+export async function updateBanner(bannerId: string, bannerData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('promotional_banners')
+    .update(bannerData)
+    .eq('id', bannerId)
+    .select();
+
+  return { data, error };
+}
+
+export async function deleteBanner(bannerId: string) {
+  const { data, error } = await supabase
+    .from('promotional_banners')
+    .delete()
+    .eq('id', bannerId);
+
+  return { data, error };
+}
+
+export async function fetchRatings() {
+  const { data, error } = await supabase
+    .from('ratings_reviews')
+    .select(`
+      *,
+      product:products(id, name),
+      user:users!user_id(id, full_name)
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function fetchSupportTickets() {
+  const { data, error } = await supabase
+    .from('support_tickets')
+    .select(`
+      *,
+      user:users!user_id(id, full_name, email),
+      assigned_user:users!assigned_to(id, full_name)
+    `)
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function createSupportTicket(ticketData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('support_tickets')
+    .insert(ticketData)
+    .select();
+
+  return { data, error };
+}
+
+export async function updateSupportTicket(ticketId: string, ticketData: Record<string, any>) {
+  const { data, error } = await supabase
+    .from('support_tickets')
+    .update(ticketData)
+    .eq('id', ticketId)
+    .select();
+
+  return { data, error };
+}
+
 export async function fetchDeliveryAgents() {
   const { data, error } = await supabase
     .from('users')
     .select(`
       *,
-      store:stores(*),
-      agent_location:agent_locations(*)
+      store:stores(id, name)
     `)
     .eq('role', 'delivery_agent')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
+    .order('created_at', { ascending: false });
+
+  return { data, error };
 }
 
-export async function createDeliveryAgent(agentData: any) {
+export async function createDeliveryAgent(agentData: Record<string, any>) {
   try {
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-delivery-agent`;
+    const apiUrl = `${supabaseUrl}/functions/v1/create-delivery-agent`;
 
     const { data: { session } } = await supabase.auth.getSession();
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${session?.access_token || supabaseAnonKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -325,11 +655,14 @@ export async function createDeliveryAgent(agentData: any) {
 
     return { data: result.data, error: null };
   } catch (error) {
-    return { data: null, error: { message: error instanceof Error ? error.message : 'Failed to create delivery agent' } };
+    return {
+      data: null,
+      error: { message: error instanceof Error ? error.message : 'Failed to create delivery agent' }
+    };
   }
 }
 
-export async function updateDeliveryAgent(agentId: string, agentData: any) {
+export async function updateDeliveryAgent(agentId: string, agentData: Record<string, any>) {
   const { data, error } = await supabase
     .from('users')
     .update({
@@ -339,9 +672,47 @@ export async function updateDeliveryAgent(agentId: string, agentData: any) {
       store_id: agentData.store_id || null
     })
     .eq('id', agentId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
+}
+
+export async function fetchUsers() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+export async function updateUserStatus(userId: string, isActive: boolean) {
+  const { data, error } = await supabase
+    .from('users')
+    .update({ is_active: isActive })
+    .eq('id', userId)
+    .select();
+
+  return { data, error };
+}
+
+export async function getAgentStats(agentId: string) {
+  const [ordersResult] = await Promise.all([
+    supabase.from('orders').select('id, status').eq('delivery_agent_id', agentId)
+  ]);
+
+  const deliveredOrders = ordersResult.data?.filter(o => o.status === 'delivered').length || 0;
+  const totalOrders = ordersResult.data?.length || 0;
+
+  return {
+    data: {
+      deliveredOrders,
+      totalOrders,
+      averageRating: 0,
+      totalRatings: 0
+    },
+    error: null
+  };
 }
 
 export async function updateDeliveryAgentStatus(agentId: string, isActive: boolean) {
@@ -349,438 +720,43 @@ export async function updateDeliveryAgentStatus(agentId: string, isActive: boole
     .from('users')
     .update({ is_active: isActive })
     .eq('id', agentId)
-    .select()
-  
-  return { data, error }
+    .select();
+
+  return { data, error };
 }
 
 export async function deleteDeliveryAgent(agentId: string) {
-  const { error: profileError } = await supabase
+  const { data, error } = await supabase
     .from('users')
     .delete()
-    .eq('id', agentId)
-  
-  if (profileError) return { data: null, error: profileError }
-  
-  const { error: authError } = await supabase.auth.admin.deleteUser(agentId)
-  
-  return { data: { id: agentId }, error: authError }
+    .eq('id', agentId);
+
+  return { data, error };
 }
 
-export async function getAgentStats(agentId: string) {
-  const [ordersResult, ratingsResult] = await Promise.all([
-    supabase.from('orders').select('*').eq('delivery_agent_id', agentId),
-    supabase.from('agent_ratings').select('rating').eq('agent_id', agentId)
-  ])
-  
-  const deliveredOrders = ordersResult.data?.filter(o => o.status === 'delivered').length || 0
-  const totalOrders = ordersResult.data?.length || 0
-  const ratings = ratingsResult.data || []
-  const averageRating = ratings.length > 0 
-    ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
-    : 0
-  
-  return {
-    data: {
-      deliveredOrders,
-      totalOrders,
-      averageRating: Number(averageRating.toFixed(1)),
-      totalRatings: ratings.length
-    },
-    error: null
-  }
-}
-
-// Stores
-export async function fetchStores() {
-  const { data, error } = await supabase
-    .from('stores')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-export async function createStore(storeData: any) {
-  const { data, error } = await supabase
-    .from('stores')
-    .insert(storeData)
-    .select()
-  
-  return { data, error }
-}
-
-export async function updateStore(storeId: string, storeData: any) {
-  const { data, error } = await supabase
-    .from('stores')
-    .update(storeData)
-    .eq('id', storeId)
-    .select()
-  
-  return { data, error }
-}
-
-export async function deleteStore(storeId: string) {
-  const { data, error } = await supabase
-    .from('stores')
-    .delete()
-    .eq('id', storeId)
-  
-  return { data, error }
-}
-
-// Banners
-export async function fetchBanners() {
-  const { data, error } = await supabase
-    .from('promotional_banners')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-export async function createBanner(bannerData: any) {
-  const { data, error } = await supabase
-    .from('promotional_banners')
-    .insert(bannerData)
-    .select()
-  
-  return { data, error }
-}
-
-export async function updateBanner(bannerId: string, bannerData: any) {
-  const { data, error } = await supabase
-    .from('promotional_banners')
-    .update(bannerData)
-    .eq('id', bannerId)
-    .select()
-  
-  return { data, error }
-}
-
-export async function deleteBanner(bannerId: string) {
-  const { data, error } = await supabase
-    .from('promotional_banners')
-    .delete()
-    .eq('id', bannerId)
-  
-  return { data, error }
-}
-
-// Coupons
-export async function fetchCoupons() {
-  const { data, error } = await supabase
-    .from('coupons')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-export async function createCoupon(couponData: any) {
-  const { data, error } = await supabase
-    .from('coupons')
-    .insert(couponData)
-    .select()
-  
-  return { data, error }
-}
-
-export async function updateCoupon(couponId: string, couponData: any) {
-  const { data, error } = await supabase
-    .from('coupons')
-    .update(couponData)
-    .eq('id', couponId)
-    .select()
-  
-  return { data, error }
-}
-
-export async function deleteCoupon(couponId: string) {
-  const { data, error } = await supabase
-    .from('coupons')
-    .delete()
-    .eq('id', couponId)
-  
-  return { data, error }
-}
-
-// Helper to sanitize bulk inventory payloads (remove derived fields)
-export function sanitizeBulkPayload(row: any) {
-  const {
-    available_quantity,   // derived - REMOVE
-    product_name,         // from view - REMOVE
-    description,          // from view - REMOVE  
-    ...safe
-  } = row ?? {};
-  return safe;
-}
-
-// Bulk Inventory
-export async function fetchBulkInventory() {
-  const { data, error } = await supabase
-    .from('v_bulk_inventory')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-export async function getBulkInventoryByStore(storeId: string) {
-  const { data, error } = await supabase
-    .from('bulk_inventory')
-    .select(`
-      *,
-      product:products(*,
-        category:categories(*),
-        variants:product_variants(*)
-      )
-    `)
-    .eq('store_id', storeId)
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-// Purchase Records
-export async function fetchPurchaseRecords() {
-  const { data, error } = await supabase
-    .from('purchase_records')
-    .select(`
-      *,
-      store:stores(*),
-      product:products(*)
-    `)
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-export async function createPurchaseRecord(purchaseData: any) {
-  const batchNumber = `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
-  
-  const { data, error } = await supabase
-    .from('purchase_records')
-    .insert({
-      ...purchaseData,
-      batch_number: batchNumber,
-      remaining_quantity: purchaseData.quantity
-    })
-    .select()
-  
-  return { data, error }
-}
-
-export async function updatePurchaseRecord(recordId: string, purchaseData: any) {
-  const { data, error } = await supabase
-    .from('purchase_records')
-    .update(purchaseData)
-    .eq('id', recordId)
-    .select()
-  
-  return { data, error }
-}
-
-export async function deletePurchaseRecord(recordId: string) {
-  const { data, error } = await supabase
-    .from('purchase_records')
-    .delete()
-    .eq('id', recordId)
-  
-  return { data, error }
-}
-
-// Check product stock availability
-export async function checkProductStock(storeId: string, productId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('bulk_inventory')
-      .select('total_quantity, reserved_quantity, available_quantity, weighted_avg_cost, unit_label')
-      .eq('store_id', storeId)
-      .eq('product_id', productId)
-      .maybeSingle()
-    
-    if (error) {
-      console.error('Stock check error:', error)
-      return { hasStock: false, availableQuantity: 0, error: error.message }
-    }
-    
-    if (!data) {
-      return { 
-        hasStock: false, 
-        availableQuantity: 0, 
-        message: 'No bulk inventory found for this product',
-        error: null 
-      }
-    }
-    
-    const available = Number(data.available_quantity || 0)
-    
-    return { 
-      hasStock: available > 0, 
-      availableQuantity: available,
-      avgCost: Number(data.weighted_avg_cost || 0),
-      unitLabel: data.unit_label || 'kg',
-      message: available > 0 
-        ? `Available: ${available.toFixed(2)} ${data.unit_label || 'kg'}`
-        : 'No stock available',
-      error: null 
-    }
-  } catch (error) {
-    console.error('Stock check exception:', error)
-    return { 
-      hasStock: false, 
-      availableQuantity: 0, 
-      error: 'Failed to check stock availability' 
-    }
-  }
-}
-
-// Inventory Adjustments
-export async function fetchInventoryAdjustments() {
-  const { data, error } = await supabase
-    .from('inventory_adjustments')
-    .select(`
-      *,
-      store:stores(*),
-      product:products(*),
-      adjusted_by_user:users!adjusted_by(*)
-    `)
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-export async function createInventoryAdjustment(adjustmentData: any) {
-  // Apply the adjustment to bulk inventory immediately
-  const { error: adjustError } = await supabase.rpc('apply_inventory_adjustment', {
-    p_store_id: adjustmentData.store_id,
-    p_product_id: adjustmentData.product_id,
-    p_adjustment_type: adjustmentData.adjustment_type,
-    p_quantity: adjustmentData.quantity_adjusted,
-    p_cost_impact: adjustmentData.cost_impact,
-    p_reason: adjustmentData.reason,
-    p_adjusted_by: adjustmentData.adjusted_by
-  });
-  
-  if (adjustError) {
-    return { data: null, error: adjustError };
-  }
-  
-  const { data, error } = await supabase
-    .from('inventory_adjustments')
-    .insert(adjustmentData)
-    .select()
-  
-  return { data, error }
-}
-
-export async function updateInventoryAdjustment(adjustmentId: string, adjustmentData: any) {
-  const { data, error } = await supabase
-    .from('inventory_adjustments')
-    .update(adjustmentData)
-    .eq('id', adjustmentId)
-    .select()
-  
-  return { data, error }
-}
-
-export async function deleteInventoryAdjustment(adjustmentId: string) {
-  const { data, error } = await supabase
-    .from('inventory_adjustments')
-    .delete()
-    .eq('id', adjustmentId)
-  
-  return { data, error }
-}
-
-// Product Variants
-export async function fetchProductVariants() {
-  const { data, error } = await supabase
-    .from('product_variants')
-    .select(`
-      *,
-      product:products(*,
-        category:categories(*)
-      )
-    `)
-    .order('created_at', { ascending: false })
-  
-  return { data, error }
-}
-
-// Profit Analysis
 export async function getProfitAnalysis(storeId?: string) {
-  let query = supabase.from('profit_analysis').select('*')
-  
+  let query = supabase.from('sales_cost_allocation').select('*');
+
   if (storeId) {
-    query = query.eq('store_id', storeId)
+    query = query.eq('store_id', storeId);
   }
-  
-  const { data, error } = await query.order('net_profit', { ascending: false })
-  
-  return { data, error }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  return { data, error };
 }
 
-export async function getProductProfitDetails(productId: string, storeId: string) {
-  const { data, error } = await supabase
+export async function getProductProfitDetails(productId: string, storeId?: string) {
+  let query = supabase
     .from('purchase_records')
     .select('*')
-    .eq('product_id', productId)
-    .eq('store_id', storeId)
-    .order('purchase_date', { ascending: false })
-  
-  return { data, error }
-}
+    .eq('product_id', productId);
 
-// Calculate variant availability from bulk inventory
-export async function calculateVariantAvailability(storeId: string, variantId: string) {
-  try {
-    const { data: variant, error: variantError } = await supabase
-      .from('product_variants')
-      .select('*, product:products(*)')
-      .eq('id', variantId)
-      .single()
-    
-    if (variantError) return { data: 0, error: variantError }
-    
-    const { data: bulkStock, error: bulkError } = await supabase
-      .from('bulk_inventory')
-      .select('total_quantity, reserved_quantity')
-      .eq('store_id', storeId)
-      .eq('product_id', variant.product_id)
-      .single()
-    
-    if (bulkError || !bulkStock) return { data: 0, error: null }
-    
-    const availableQuantity = (bulkStock.total_quantity || 0) - (bulkStock.reserved_quantity || 0)
-    const baseUnitQuantity = variant.base_unit_quantity || 1.0
-    const availableVariants = Math.floor(availableQuantity / baseUnitQuantity)
-    
-    return { data: availableVariants, error: null }
-  } catch (error) {
-    return { data: 0, error }
+  if (storeId) {
+    query = query.eq('store_id', storeId);
   }
-}
 
-export async function getAllVariantAvailability(storeId: string) {
-  try {
-    const { data: variants, error: variantsError } = await supabase
-      .from('product_variants')
-      .select('*, product:products(*)')
-      .eq('status', 'active')
-    
-    if (variantsError) throw variantsError
-    
-    const availability: Record<string, number> = {}
-    
-    for (const variant of variants || []) {
-      const result = await calculateVariantAvailability(storeId, variant.id)
-      availability[variant.id] = result.data || 0
-    }
-    
-    return { data: availability, error: null }
-  } catch (error) {
-    return { data: {}, error }
-  }
+  const { data, error } = await query.order('purchase_date', { ascending: false });
+
+  return { data, error };
 }

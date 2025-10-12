@@ -55,19 +55,8 @@ export function useAuth() {
               console.log('✅ Profile loaded:', userProfile.email, userProfile.role);
               setProfile(userProfile);
             } else {
-              console.log('⚠️ Profile not found, using fallback');
-              // Fallback to admin role if profile not found
-              setProfile({
-                id: session.user.id,
-                full_name: 'Admin User',
-                email: session.user.email || 'admin@zepta.com',
-                mobile_number: null,
-                role: 'admin',
-                store_id: null,
-                is_active: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              });
+              console.error('❌ Profile not found for user:', session.user.id, error);
+              setProfile(null);
             }
           } catch (err) {
             console.error('❌ Error fetching profile:', err);
@@ -114,19 +103,8 @@ export function useAuth() {
           console.log('✅ Profile updated:', userProfile.email);
           setProfile(userProfile);
         } else {
-          console.log('⚠️ Profile not found on auth change, using fallback');
-          // Fallback to admin role if profile not found
-          setProfile({
-            id: session.user.id,
-            full_name: 'Admin User',
-            email: session.user.email || 'admin@zepta.com',
-            mobile_number: null,
-            role: 'admin',
-            store_id: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
+          console.error('❌ Profile not found on auth change:', session.user.id, error);
+          setProfile(null);
         }
       } else {
         setProfile(null);
