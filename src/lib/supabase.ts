@@ -1,24 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 console.log('Supabase init:', {
   url: supabaseUrl,
-  keyPrefix: supabaseServiceRoleKey?.substring(0, 20),
-  keyLength: supabaseServiceRoleKey?.length
+  keyPrefix: supabaseAnonKey?.substring(0, 20),
+  keyLength: supabaseAnonKey?.length
 })
 
-if (!supabaseUrl || !supabaseServiceRoleKey) {
+if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables:', {
     url: !!supabaseUrl,
-    key: !!supabaseServiceRoleKey
+    key: !!supabaseAnonKey
   })
-  throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_SERVICE_ROLE_KEY must be set in .env file')
+  throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in .env file')
 }
 
-// Single client instance using service role for admin operations
-export const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+// Single client instance using anon key with auth
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
