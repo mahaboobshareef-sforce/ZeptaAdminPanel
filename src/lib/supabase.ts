@@ -3,6 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
+console.log('Supabase init:', {
+  url: supabaseUrl,
+  keyPrefix: supabaseServiceRoleKey?.substring(0, 20),
+  keyLength: supabaseServiceRoleKey?.length
+})
+
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error('Missing Supabase environment variables:', {
     url: !!supabaseUrl,
