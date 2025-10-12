@@ -11,57 +11,91 @@ export function useAuth() {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    // Add timeout protection
+    timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('Auth loading timeout - forcing completion');
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
 
     // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!isMounted) return;
+    const initAuth = async () => {
+      try {
+        console.log('🔐 Initializing auth...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      setSession(session);
-      setUser(session?.user ?? null);
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError);
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-      if (session?.user) {
-        try {
-          // Fetch actual user profile from database
-          const { data: userProfile, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
+        if (!isMounted) return;
 
-          if (!isMounted) return;
+        console.log('👤 Session:', session ? 'Found' : 'Not found');
+        setSession(session);
+        setUser(session?.user ?? null);
 
-          if (userProfile && !error) {
-            setProfile(userProfile);
-          } else {
-            // Fallback to admin role if profile not found
-            setProfile({
-              id: session.user.id,
-              full_name: 'Admin User',
-              email: session.user.email || 'admin@zepta.com',
-              mobile_number: null,
-              role: 'admin',
-              store_id: null,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
+        if (session?.user) {
+          try {
+            console.log('📊 Fetching user profile...');
+            // Fetch actual user profile from database
+            const { data: userProfile, error } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+            if (!isMounted) return;
+
+            if (userProfile && !error) {
+              console.log('✅ Profile loaded:', userProfile.email, userProfile.role);
+              setProfile(userProfile);
+            } else {
+              console.log('⚠️ Profile not found, using fallback');
+              // Fallback to admin role if profile not found
+              setProfile({
+                id: session.user.id,
+                full_name: 'Admin User',
+                email: session.user.email || 'admin@zepta.com',
+                mobile_number: null,
+                role: 'admin',
+                store_id: null,
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.error('❌ Error fetching profile:', err);
           }
-        } catch (err) {
-          console.error('Error fetching profile:', err);
+        }
+
+        if (isMounted) {
+          clearTimeout(timeoutId);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('❌ Auth initialization error:', err);
+        if (isMounted) {
+          clearTimeout(timeoutId);
+          setLoading(false);
         }
       }
+    };
 
-      setLoading(false);
-    }).catch((err) => {
-      console.error('Error getting session:', err);
-      if (isMounted) setLoading(false);
-    });
+    initAuth();
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
+
+      console.log('🔄 Auth state changed:', event);
 
       setSession(session);
       setUser(session?.user ?? null);
@@ -77,8 +111,10 @@ export function useAuth() {
         if (!isMounted) return;
 
         if (userProfile && !error) {
+          console.log('✅ Profile updated:', userProfile.email);
           setProfile(userProfile);
         } else {
+          console.log('⚠️ Profile not found on auth change, using fallback');
           // Fallback to admin role if profile not found
           setProfile({
             id: session.user.id,
@@ -101,6 +137,7 @@ export function useAuth() {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
