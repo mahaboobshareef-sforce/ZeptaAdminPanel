@@ -1,0 +1,321 @@
+Module,Test ID,Test Case Name,Priority,Prerequisites,Test Steps,Expected Result,Status,Notes
+Authentication,AUTH-001,Valid Login,High,Test data loaded,"1. Navigate to login page
+2. Enter: venkata.ramesh@gmail.com
+3. Enter password: password123
+4. Click Login",User logged in successfully and redirected to Dashboard,,
+Authentication,AUTH-002,Invalid Login,High,None,"1. Navigate to login page
+2. Enter: invalid@email.com
+3. Enter password: wrong123
+4. Click Login",Error message displayed. User not logged in,,
+Authentication,AUTH-003,Logout,High,User logged in,"1. Click on user profile/menu
+2. Click Logout",User logged out and redirected to login page,,
+Authentication,AUTH-004,Session Persistence,Medium,User logged in,"1. Refresh browser page
+2. Check if still logged in",User remains logged in after refresh,,
+Dashboard,DASH-001,Dashboard Loads,High,User logged in,1. Navigate to Dashboard page,All statistics cards display with numbers. No errors,,
+Dashboard,DASH-002,Revenue Display,Medium,Orders exist,1. Check total revenue card,Revenue matches sum of delivered orders,,
+Dashboard,DASH-003,Order Count,Medium,Orders exist,1. Check total orders count,Count matches Orders page total,,
+Stores,STORE-001,View All Stores,High,Test data loaded,1. Navigate to Stores page,All 3 stores displayed with details,,
+Stores,STORE-002,Create Store,High,User logged in,"1. Click Add Store
+2. Enter name: Test Store
+3. Enter address: Test Address
+4. Enter coordinates
+5. Submit",New store created and appears in list,,
+Stores,STORE-003,Edit Store,Medium,Store exists,"1. Click Edit on a store
+2. Modify name
+3. Save",Store details updated successfully,,
+Stores,STORE-004,Delete Store,Low,Store with no dependencies exists,"1. Click Delete on store
+2. Confirm deletion",Store removed from list,,
+Stores,STORE-005,Search Stores,Low,Multiple stores exist,"1. Enter store name in search
+2. Check results",Only matching stores displayed,,
+Categories,CAT-001,View Categories,High,Test data loaded,1. Navigate to Categories page,All 10 categories displayed,,
+Categories,CAT-002,Create Category,High,User logged in,"1. Click Add Category
+2. Enter name: Test Category
+3. Select type
+4. Submit",New category created,,
+Categories,CAT-003,Delete Category,Medium,Empty category exists,"1. Click Delete
+2. Confirm",Category deleted successfully,,
+Products,PROD-001,View All Products,High,Test data loaded,1. Navigate to Products page,All 20 products displayed with images and details,,
+Products,PROD-002,Search Product,High,Products exist,"1. Enter 'tomato' in search
+2. Check results",Only tomato products displayed,,
+Products,PROD-003,Filter by Category,High,Products exist,"1. Select category filter
+2. Check results",Only products from selected category shown,,
+Products,PROD-004,Create Product,High,Categories exist,"1. Click Add Product
+2. Enter name: Test Product
+3. Add description
+4. Select category
+5. Add image URL
+6. Submit",New product created successfully,,
+Products,PROD-005,Mark as Featured,Medium,Product exists,"1. Click on product
+2. Toggle Featured status
+3. Save",Product marked as featured on homepage,,
+Products,PROD-006,Deactivate Product,Medium,Active product exists,"1. Select product
+2. Change status to Inactive
+3. Save",Product no longer available for new orders,,
+Variants,VAR-001,View Product Variants,High,Product exists,"1. Select a product
+2. View variants section",All variants displayed with prices and SKUs,,
+Variants,VAR-002,Add Variant,High,Product exists,"1. Select product
+2. Click Add Variant
+3. Enter unit label: 2kg
+4. Enter price: 150
+5. Submit",New variant added to product,,
+Variants,VAR-003,Set Discount Price,Medium,Variant exists,"1. Edit variant
+2. Add discount price
+3. Save",Discount price displayed. Original price struck through,,
+Variants,VAR-004,Delete Variant,Low,Unused variant exists,"1. Select variant
+2. Click Delete
+3. Confirm",Variant removed from product,,
+Inventory,INV-001,View Store Inventory,High,Test data loaded,1. Navigate to Inventory page,All inventory items displayed with stock levels,,
+Inventory,INV-002,Filter by Store,High,Multiple stores exist,"1. Select store from filter
+2. Check results",Only inventory for selected store shown,,
+Inventory,INV-003,Search Product,Medium,Inventory exists,"1. Enter product name
+2. Check results",Matching inventory items displayed,,
+Inventory,INV-004,Low Stock Alert,High,Low stock items exist,1. Check for low stock badges,Items below threshold marked in yellow/red,,
+Inventory,INV-005,Manual Adjustment - Add,Medium,Inventory exists,"1. Select item
+2. Click Adjust Stock
+3. Enter +10 units
+4. Add reason
+5. Submit",Stock increased by 10. Adjustment logged,,
+Inventory,INV-006,Manual Adjustment - Remove,Medium,Inventory exists,"1. Select item
+2. Click Adjust Stock
+3. Enter -5 units
+4. Reason: Damaged
+5. Submit",Stock decreased by 5. Adjustment logged,,
+Inventory,INV-007,View Reserved Stock,Medium,Orders exist,1. Check reserved quantity column,Reserved matches pending order quantities,,
+Bulk Inventory,BULK-001,View Bulk Stock,High,Test data loaded,1. Navigate to Bulk Inventory page,All bulk inventory displayed with quantities and costs,,
+Bulk Inventory,BULK-002,Filter by Store,High,Multiple stores exist,"1. Select store filter
+2. Check results",Only bulk stock for selected store shown,,
+Bulk Inventory,BULK-003,Stock Value Calculation,Medium,Bulk stock exists,1. Check total stock value,Value = Sum of (available_qty × avg_cost),,
+Bulk Inventory,BULK-004,Variant Availability,High,Bulk stock exists,1. Check Variant Availability column,Shows correct number of packageable units per variant,,
+Bulk Inventory,BULK-005,Avg Cost Display,Medium,Bulk stock exists,1. Check average cost column,Weighted average cost displayed correctly,,
+Adjustments,ADJ-001,View Adjustment History,Medium,Adjustments made,1. Navigate to Inventory Adjustments page,All adjustments listed with dates and reasons,,
+Adjustments,ADJ-002,Record Damage,High,Inventory exists,"1. Click New Adjustment
+2. Select product
+3. Type: Damage
+4. Quantity: -3
+5. Add notes
+6. Submit",Adjustment recorded. Stock reduced,,
+Adjustments,ADJ-003,Record Expiry,Medium,Inventory exists,"1. New Adjustment
+2. Type: Expired
+3. Enter quantity
+4. Submit",Expired stock removed from inventory,,
+Purchase,PUR-001,View Purchases,High,Purchases exist,1. Navigate to Purchase Management page,All purchases displayed with dates and values,,
+Purchase,PUR-002,Create Purchase,High,Products exist,"1. Click New Purchase
+2. Enter supplier name
+3. Select store
+4. Add products
+5. Set costs
+6. Submit",Purchase created. Bulk inventory updated,,
+Purchase,PUR-003,Bulk Inventory Update,High,Purchase created,"1. Create purchase with 50kg rice
+2. Navigate to Bulk Inventory
+3. Find rice",Bulk stock increased by 50kg,,
+Purchase,PUR-004,Cost Averaging,Medium,Multiple purchases exist,"1. Buy 100kg @ ₹40/kg
+2. Buy 50kg @ ₹45/kg
+3. Check avg cost",Weighted average = (100×40 + 50×45)/150 = ₹41.67,,
+Purchase,PUR-005,Purchase History,Low,Purchases exist,"1. Filter by date range
+2. Check results",Only purchases in date range shown,,
+Orders,ORD-001,View All Orders,High,Test data loaded,1. Navigate to Orders page,All 40 orders displayed with statuses,,
+Orders,ORD-002,Filter by Status,High,Orders exist,"1. Select 'Delivered' filter
+2. Check results",Only delivered orders shown,,
+Orders,ORD-003,Filter by Payment Status,Medium,Orders exist,"1. Select 'Paid' filter
+2. Check results",Only paid orders shown,,
+Orders,ORD-004,Search Order,Medium,Orders exist,"1. Enter customer name
+2. Search",Matching orders displayed,,
+Orders,ORD-005,View Order Details,High,Order exists,"1. Click on an order
+2. View details popup/page",All order items displayed. Customer and delivery address shown,,
+Orders,ORD-006,Accept Order,High,Pending order exists,"1. Select pending order
+2. Change status to 'order_accepted'
+3. Save",Status updated. Customer notified,,
+Orders,ORD-007,Pack Order,High,Accepted order exists,"1. Select accepted order
+2. Change status to 'packed'
+3. Save",Status updated to packed,,
+Orders,ORD-008,Assign Delivery Agent,High,Packed order + agents exist,"1. Select packed order
+2. Choose delivery agent
+3. Status → assigned_delivery_partner
+4. Save",Agent assigned. Order status updated,,
+Orders,ORD-009,Out for Delivery,High,Assigned order exists,"1. Select assigned order
+2. Status → out_for_delivery
+3. Save",Status updated. Agent notified,,
+Orders,ORD-010,Complete Delivery,High,Out for delivery order exists,"1. Select order
+2. Status → delivered
+3. Save","Status = delivered. Payment = paid. Inventory deducted. Order complete",,
+Orders,ORD-011,Cancel Order,Medium,Active order exists,"1. Select order
+2. Click Cancel
+3. Add reason
+4. Confirm",Order cancelled. Reserved stock released,,
+Orders,ORD-012,Order Total Calculation,Medium,Order with items exists,"1. View order details
+2. Check total",Total = Sum(items) + delivery - discount,,
+Delivery Agents,AGENT-001,View All Agents,High,Test data loaded,1. Navigate to Delivery Agents page,All 8 agents displayed with store assignments,,
+Delivery Agents,AGENT-002,Create Agent,High,Stores exist,"1. Click Add Agent
+2. Enter details
+3. Assign store
+4. Submit",New agent created and assigned to store,,
+Delivery Agents,AGENT-003,View Agent Location,Medium,Agent exists,"1. Select agent
+2. View location",Agent's current location shown on map (if implemented),,
+Delivery Agents,AGENT-004,View Assigned Orders,Medium,Agent with orders exists,"1. Select agent
+2. View orders tab",All orders assigned to agent listed,,
+Delivery Agents,AGENT-005,Deactivate Agent,Low,Agent exists,"1. Select agent
+2. Change status to Inactive
+3. Save",Agent deactivated. Cannot be assigned new orders,,
+Users,USER-001,View All Users,High,Test data loaded,1. Navigate to Users page,All 38 users (30 customers + 8 agents) displayed,,
+Users,USER-002,Filter by Role,High,Users exist,"1. Select 'Customer' filter
+2. Check results",Only customers shown,,
+Users,USER-003,Search User,Medium,Users exist,"1. Enter name in search
+2. Check results",Matching users displayed,,
+Users,USER-004,View Customer Details,Medium,Customer exists,"1. Select customer
+2. View profile",Details displayed: name - email - phone - addresses,,
+Users,USER-005,View Order History,Medium,Customer with orders exists,"1. Select customer
+2. View orders tab",All customer orders listed chronologically,,
+Users,USER-006,Deactivate User,Low,User exists,"1. Select user
+2. Toggle active status
+3. Save",User deactivated. Cannot place orders,,
+Payments,PAY-001,View All Payments,High,Orders exist,1. Navigate to Payments page,All payment records displayed,,
+Payments,PAY-002,Filter by Status,Medium,Payments exist,"1. Select 'Pending' filter
+2. Check results",Only pending payments shown,,
+Payments,PAY-003,Filter by Method,Medium,Payments exist,"1. Select 'COD' filter
+2. Check results",Only COD payments shown,,
+Payments,PAY-004,Mark COD as Received,High,COD pending payment exists,"1. Select payment
+2. Click Mark as Paid
+3. Confirm",Payment status updated to paid,,
+Payments,PAY-005,View Transaction ID,Medium,Online payment exists,"1. View payment details
+2. Check transaction ID",Transaction ID displayed for online payments,,
+Refunds,REF-001,View All Refunds,Medium,Refunds exist,1. Navigate to Refunds page,All refunds displayed with amounts and statuses,,
+Refunds,REF-002,Create Refund,High,Delivered order exists,"1. Click New Refund
+2. Select order
+3. Enter amount
+4. Add reason
+5. Submit",Refund created successfully,,
+Refunds,REF-003,Full Refund,High,Paid order exists,"1. Create refund
+2. Amount = order total
+3. Process",Full refund processed. Payment status updated,,
+Refunds,REF-004,Partial Refund,Medium,Paid order exists,"1. Create refund
+2. Amount < order total
+3. Process",Partial refund processed,,
+Refunds,REF-005,Filter by Date,Low,Refunds exist,"1. Set date range
+2. Apply filter",Only refunds in range shown,,
+Profit Analysis,PROFIT-001,View Overall Profit,High,Delivered orders exist,1. Navigate to Profit Analysis page,Total profit/loss displayed with breakdown,,
+Profit Analysis,PROFIT-002,Product-wise Profit,Medium,Multiple products sold,"1. View product profit table
+2. Sort by profit",Products listed with individual profit margins,,
+Profit Analysis,PROFIT-003,Store-wise Performance,Medium,Multiple stores,"1. Filter by store
+2. Check profit",Profit calculated per store,,
+Profit Analysis,PROFIT-004,Date Range Filter,Medium,Historical data,"1. Set date range
+2. Apply filter",Profit calculated for selected period only,,
+Coupons,COUP-001,View All Coupons,High,Test data loaded,1. Navigate to Coupons page,2 coupons displayed: WELCOME50 and SAVE10,,
+Coupons,COUP-002,Create Fixed Discount,High,User logged in,"1. Click Add Coupon
+2. Code: TEST50
+3. Type: Fixed
+4. Value: 50
+5. Min order: 200
+6. Submit",Coupon created successfully,,
+Coupons,COUP-003,Create Percentage Discount,High,User logged in,"1. Add Coupon
+2. Code: SALE15
+3. Type: Percentage
+4. Value: 15
+5. Max discount: 150
+6. Submit",Percentage coupon created,,
+Coupons,COUP-004,Set Validity Period,Medium,Coupon being created,"1. Set start date
+2. Set end date
+3. Submit",Coupon only valid between dates,,
+Coupons,COUP-005,Usage Limit,Medium,Coupon exists,"1. Set usage limit: 100
+2. Check used count",Shows X/100 used. Disabled when limit reached,,
+Coupons,COUP-006,Deactivate Coupon,Low,Active coupon exists,"1. Select coupon
+2. Change status to Inactive
+3. Save",Coupon cannot be applied to new orders,,
+Banners,BAN-001,View All Banners,Medium,Test data loaded,1. Navigate to Banners page,2 promotional banners displayed,,
+Banners,BAN-002,Create Banner,Medium,Categories/products exist,"1. Click Add Banner
+2. Enter title
+3. Add image URL
+4. Link to category
+5. Set dates
+6. Submit",Banner created and displayed,,
+Banners,BAN-003,Link to Category,Medium,Banner being created,"1. Select link type: Category
+2. Choose category
+3. Save",Clicking banner navigates to category,,
+Banners,BAN-004,Set Display Order,Low,Multiple banners exist,"1. Set sort order: 1 - 2 - 3
+2. Save",Banners displayed in specified order,,
+Banners,BAN-005,Date Range,Medium,Banner exists,"1. Set start/end dates
+2. Save",Banner only shows during date range,,
+Ratings,RATE-001,View Product Ratings,Medium,Ratings exist,1. Navigate to Ratings page,All product ratings displayed with scores,,
+Ratings,RATE-002,View Agent Ratings,Medium,Agent ratings exist,1. Switch to Agent Ratings tab,All agent ratings with customer feedback shown,,
+Ratings,RATE-003,Filter by Score,Low,Ratings exist,"1. Filter: 4-5 stars
+2. Apply",Only high-rated items shown,,
+Ratings,RATE-004,Read Reviews,Low,Reviews exist,"1. Click on rating
+2. View details",Customer feedback and comments displayed,,
+Analytics,ANA-001,View Dashboard,High,Historical data,1. Navigate to Analytics page,Charts and graphs displayed with sales data,,
+Analytics,ANA-002,Sales Trends,Medium,Multiple days data,"1. View sales trend chart
+2. Check data points",Chart shows daily/weekly/monthly trends,,
+Analytics,ANA-003,Top Products,Medium,Product sales exist,1. View top products section,Best-selling products listed with quantities,,
+Analytics,ANA-004,Revenue by Store,Medium,Multiple stores,"1. View store comparison
+2. Check values",Each store's revenue shown,,
+Settings,SET-001,View Settings,Low,User logged in,1. Navigate to Settings page,Settings page loads with configuration options,,
+Settings,SET-002,Update Profile,Low,User logged in,"1. Edit admin profile
+2. Update details
+3. Save",Profile updated successfully,,
+Integration,INT-001,Complete Order Flow,Critical,All data loaded,"1. View pending order
+2. Accept → Pack → Assign → Deliver
+3. Check all updates","Order completed. Stock deducted. Payment recorded. All status updates work.",,
+Integration,INT-002,Purchase to Stock Flow,Critical,Products exist,"1. Create purchase (50kg rice)
+2. Check bulk inventory
+3. Verify stock increase",Bulk inventory increased correctly by purchase quantity,,
+Integration,INT-003,Bulk to Retail Conversion,Critical,Bulk stock exists,"1. View bulk inventory
+2. Check variant availability
+3. Verify calculations",Correct number of retail units calculated from bulk stock,,
+Integration,INT-004,Order Reservation,Critical,Orders and inventory exist,"1. Place order (reserves stock)
+2. Check inventory
+3. Verify reserved quantity
+4. Deliver order
+5. Check stock deducted","Stock reserved on order. Stock deducted on delivery.",,
+Integration,INT-005,Multi-Store Isolation,High,Multiple stores,"1. Create order from Store A
+2. Check Store B inventory
+3. Verify no impact",Store B inventory unchanged. Stores independent,,
+Integration,INT-006,Agent Store Constraint,High,Agents and stores exist,"1. Try assigning Store A order to Store B agent
+2. Check validation",Error shown or agent filtered by store,,
+Integration,INT-007,Coupon Application,Medium,Order and coupon exist,"1. Order total: ₹250
+2. Apply WELCOME50
+3. Check final total",Final total = ₹250 - ₹50 = ₹200,,
+Integration,INT-008,Refund Updates,Medium,Delivered order,"1. Process full refund
+2. Check payment status
+3. Check order status",Payment updated. Order marked as refunded,,
+Performance,PERF-001,Dashboard Load Time,Medium,1000+ orders,1. Navigate to Dashboard. Measure load time,Page loads in under 2 seconds,,
+Performance,PERF-002,Product Search Speed,Medium,100+ products,"1. Search for product
+2. Measure response time",Results appear in under 500ms,,
+Performance,PERF-003,Inventory Pagination,Low,500+ items,1. Navigate through inventory pages,Smooth pagination. No lag,,
+Performance,PERF-004,Order List Performance,Medium,Large order count,1. Load orders page with filters,Page responsive. No freezing,,
+Security,SEC-001,Unauthorized Access,Critical,Logged out,"1. Try accessing /dashboard
+2. Check redirect",Redirected to login. Cannot access,,
+Security,SEC-002,Session Timeout,High,User logged in,"1. Wait 30 minutes idle
+2. Try action",Session expired. Must login again,,
+Security,SEC-003,Logout Clears Session,High,User logged in,"1. Logout
+2. Press browser Back
+3. Try to access page",Cannot access. Redirected to login,,
+Security,SEC-004,RLS Protection,Critical,Multiple users,"1. Login as User A
+2. Check data access
+3. Verify no User B data shown",Users only see their authorized data,,
+UI/UX,UI-001,Responsive - Desktop,Medium,Any page,"1. View on 1920x1080
+2. Check layout",All elements properly sized and positioned,,
+UI/UX,UI-002,Responsive - Tablet,Medium,Any page,"1. View on 768px width
+2. Check layout",Layout adjusts. All features accessible,,
+UI/UX,UI-003,Responsive - Mobile,Medium,Any page,"1. View on 375px width
+2. Check layout",Mobile-friendly. Navigation works,,
+UI/UX,UI-004,Empty State Messages,Low,Empty table/list,1. View page with no data,Helpful message displayed explaining what to do,,
+UI/UX,UI-005,Loading States,Medium,Any data fetch,"1. Trigger data load
+2. Observe",Loading spinner shown during fetch,,
+UI/UX,UI-006,Error Handling,Medium,Simulate API failure,"1. Disconnect internet
+2. Try action",Clear error message. Retry option provided,,
+UI/UX,UI-007,Image Broken URLs,Low,Product with invalid image,"1. View product
+2. Check image",Placeholder image shown. No broken image icon,,
+Browser,BROW-001,Chrome Compatibility,High,Any feature,1. Test all features in Chrome,All features work correctly,,
+Browser,BROW-002,Firefox Compatibility,Medium,Any feature,1. Test all features in Firefox,All features work correctly,,
+Browser,BROW-003,Safari Compatibility,Low,Any feature,1. Test all features in Safari,All features work correctly,,
+Edge Cases,EDGE-001,Large Order Values,Low,Create order,"1. Create order > ₹1 -00 -000
+2. Check display",Number formatted correctly. No overflow,,
+Edge Cases,EDGE-002,Zero Stock,Medium,Depleted inventory,"1. Create order for out-of-stock item
+2. Check validation",Error shown or item marked unavailable,,
+Edge Cases,EDGE-003,Special Characters,Low,Product creation,"1. Create product with name: Test & ""Quotes""
+2. Save",Product created. Special chars handled,,
+Edge Cases,EDGE-004,Future Dates,Low,Coupon creation,"1. Set coupon end date in past
+2. Try to save",Validation error or coupon auto-inactive,,
+Edge Cases,EDGE-005,Concurrent Edits,Low,Multiple users,"1. User A edits product
+2. User B edits same product
+3. Both save",Last save wins or conflict detected,,
+Edge Cases,EDGE-006,Delete Dependencies,Medium,Delete category with products,"1. Try to delete
+2. Check behavior",Error shown or cascade delete with warning,,
