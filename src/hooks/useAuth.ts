@@ -12,27 +12,6 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true;
 
-    // TEMPORARY: Mock auth for Bolt environment (can't connect to external Supabase)
-    const useMockAuth = import.meta.env.MODE === 'development';
-
-    if (useMockAuth) {
-      console.log('Using mock auth for Bolt environment');
-      setUser({ id: 'mock-user-id', email: 'admin@zepta.com' } as User);
-      setProfile({
-        id: 'mock-user-id',
-        full_name: 'Admin User',
-        email: 'admin@zepta.com',
-        mobile_number: null,
-        role: 'super_admin',
-        store_id: null,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      setLoading(false);
-      return;
-    }
-
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return;
