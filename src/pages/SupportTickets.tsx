@@ -84,7 +84,7 @@ export default function SupportTickets() {
         const [customersRes, ordersRes] = await Promise.all([
           supabase.from('users').select('id, full_name, email, mobile_number').in('id', customerIds),
           orderIds.length > 0
-            ? supabase.from('orders').select('id, order_number, order_total, status').in('id', orderIds)
+            ? supabase.from('orders').select('id, order_total, status, created_at').in('id', orderIds)
             : Promise.resolve({ data: [], error: null })
         ]);
 
@@ -163,9 +163,10 @@ export default function SupportTickets() {
 
   const selectOrder = (order: any) => {
     setSelectedOrder(order);
+    const orderNum = order.id.slice(-3).toUpperCase();
     setTicketForm({
       ...ticketForm,
-      subject: `Issue with Order #${order.order_number}`
+      subject: `Issue with Order #${orderNum}`
     });
   };
 
@@ -334,7 +335,7 @@ export default function SupportTickets() {
                     </TableCell>
                     <TableCell>{ticket.subject}</TableCell>
                     <TableCell>
-                      {ticket.order ? `#${ticket.order.order_number}` : '-'}
+                      {ticket.order ? `#${ticket.order.id.slice(-3).toUpperCase()}` : '-'}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getPriorityColor(ticket.priority)}>
@@ -436,7 +437,7 @@ export default function SupportTickets() {
                         >
                           <div className="flex justify-between items-center">
                             <div>
-                              <p className="font-medium">Order #{order.order_number}</p>
+                              <p className="font-medium">Order #{order.id.slice(-3).toUpperCase()}</p>
                               <p className="text-sm text-gray-500">
                                 {format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')} • ₹{order.order_total}
                               </p>

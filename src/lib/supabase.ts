@@ -92,8 +92,32 @@ export async function fetchOrders() {
       : Promise.resolve({ data: [], error: null })
   ]);
 
+  const variantIds = [...new Set(orderItemsRes.data?.map(item => item.variant_id).filter(Boolean) || [])];
+
+  const [variantsRes, productsRes] = await Promise.all([
+    variantIds.length > 0
+      ? supabase.from('product_variants').select('*').in('id', variantIds)
+      : Promise.resolve({ data: [], error: null }),
+    variantIds.length > 0
+      ? supabase.from('products').select('*')
+      : Promise.resolve({ data: [], error: null })
+  ]);
+
+  const variantsMap = new Map(variantsRes.data?.map(v => [v.id, v]) || []);
+  const productsMap = new Map(productsRes.data?.map(p => [p.id, p]) || []);
+
+  const enrichedOrderItems = orderItemsRes.data?.map(item => {
+    const variant = variantsMap.get(item.variant_id);
+    const product = variant ? productsMap.get(variant.product_id) : null;
+    return {
+      ...item,
+      variant,
+      product
+    };
+  }) || [];
+
   const orderItemsMap = new Map();
-  orderItemsRes.data?.forEach(item => {
+  enrichedOrderItems.forEach(item => {
     if (!orderItemsMap.has(item.order_id)) {
       orderItemsMap.set(item.order_id, []);
     }
