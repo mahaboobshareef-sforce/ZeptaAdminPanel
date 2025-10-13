@@ -21,10 +21,6 @@ import { usePermissions } from '../hooks/usePermissions';
 
 export default function PurchaseManagement() {
   const { can } = usePermissions();
-
-  if (!can('purchase_management')) {
-    return null;
-  }
   const [purchases, setPurchases] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -282,6 +278,10 @@ export default function PurchaseManagement() {
         return [{ value: 'kg', label: 'Kilograms (kg)' }];
     }
   };
+
+  if (!can('purchase_management')) {
+    return null;
+  }
 
   if (loading) {
     return (

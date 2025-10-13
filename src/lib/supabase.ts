@@ -69,15 +69,29 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function fetchOrders() {
   const { data, error } = await supabase
     .from('orders')
-    .select(`
-      *,
-      customer:users!customer_id(id, full_name, email),
-      store:stores(id, name),
-      delivery_agent:users!delivery_agent_id(id, full_name)
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
-  return { data, error };
+  if (error) return { data, error };
+
+  const ordersWithRelations = await Promise.all(
+    (data || []).map(async (order) => {
+      const [customer, store, agent] = await Promise.all([
+        order.customer_id ? supabase.from('users').select('id, full_name, email').eq('id', order.customer_id).maybeSingle() : Promise.resolve({ data: null }),
+        order.store_id ? supabase.from('stores').select('id, name').eq('id', order.store_id).maybeSingle() : Promise.resolve({ data: null }),
+        order.delivery_agent_id ? supabase.from('users').select('id, full_name').eq('id', order.delivery_agent_id).maybeSingle() : Promise.resolve({ data: null })
+      ]);
+
+      return {
+        ...order,
+        customer: customer.data,
+        store: store.data,
+        delivery_agent: agent.data
+      };
+    })
+  );
+
+  return { data: ordersWithRelations, error: null };
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
@@ -341,7 +355,7 @@ export async function fetchProductVariants() {
     .from('product_variants')
     .select(`
       *,
-      product:products(id, name, sku)
+      product:products(id, name)
     `)
     .order('created_at', { ascending: false });
 
