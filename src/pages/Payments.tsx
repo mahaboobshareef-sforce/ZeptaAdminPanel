@@ -52,24 +52,6 @@ export default function Payments() {
     }
   };
 
-  const filteredPayments = statusFilter === 'all' 
-    ? payments 
-    : payments.filter(payment => payment.status === statusFilter);
-
-  const statusColors = {
-    pending: 'warning',
-    paid: 'success',
-    failed: 'error',
-    refunded: 'info',
-  } as const;
-
-  const statusIcons = {
-    pending: Clock,
-    paid: CheckCircle,
-    failed: XCircle,
-    refunded: RefreshCw,
-  };
-
   if (!can('view_payments')) {
     return null;
   }
@@ -97,6 +79,24 @@ export default function Payments() {
       </Card>
     );
   }
+
+  const filteredPayments = statusFilter === 'all'
+    ? payments
+    : payments.filter(payment => payment.status === statusFilter);
+
+  const statusColors = {
+    pending: 'warning',
+    paid: 'success',
+    failed: 'error',
+    refunded: 'info',
+  } as const;
+
+  const statusIcons = {
+    pending: Clock,
+    paid: CheckCircle,
+    failed: XCircle,
+    refunded: RefreshCw,
+  };
 
   return (
     <div className="space-y-6">

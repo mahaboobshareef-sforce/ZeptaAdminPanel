@@ -108,9 +108,6 @@ export default function ProfitAnalysis() {
     });
   };
 
-  const stats = getTotalStats();
-  const overallMargin = stats.totalRevenue > 0 ? ((stats.totalProfit / stats.totalRevenue) * 100) : 0;
-
   useEffect(() => {
     loadData();
   }, [storeFilter]);
@@ -118,11 +115,6 @@ export default function ProfitAnalysis() {
   if (!can('view_profit_analysis')) {
     return null;
   }
-
-  const storeOptions = stores.map(store => ({
-    value: store.id,
-    label: store.name
-  }));
 
   if (loading) {
     return (
@@ -147,6 +139,14 @@ export default function ProfitAnalysis() {
       </Card>
     );
   }
+
+  const stats = getTotalStats();
+  const overallMargin = stats.totalRevenue > 0 ? ((stats.totalProfit / stats.totalRevenue) * 100) : 0;
+
+  const storeOptions = stores.map(store => ({
+    value: store.id,
+    label: store.name
+  }));
 
   return (
     <div className="space-y-6">

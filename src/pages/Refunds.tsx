@@ -53,30 +53,9 @@ export default function Refunds() {
     loadRefunds();
   }, []);
 
-  const filteredRefunds = statusFilter === 'all'
-    ? refunds
-    : refunds.filter(refund => refund.status === statusFilter);
-
   if (!can('manage_refunds')) {
     return null;
   }
-
-  const statusColors = {
-    initiated: 'warning',
-    completed: 'success',
-    failed: 'error',
-  } as const;
-
-  const statusIcons = {
-    initiated: Clock,
-    completed: CheckCircle,
-    failed: XCircle,
-  };
-
-  const typeColors = {
-    full: 'info',
-    partial: 'warning',
-  } as const;
 
   if (loading) {
     return (
@@ -101,6 +80,27 @@ export default function Refunds() {
       </Card>
     );
   }
+
+  const filteredRefunds = statusFilter === 'all'
+    ? refunds
+    : refunds.filter(refund => refund.status === statusFilter);
+
+  const statusColors = {
+    initiated: 'warning',
+    completed: 'success',
+    failed: 'error',
+  } as const;
+
+  const statusIcons = {
+    initiated: Clock,
+    completed: CheckCircle,
+    failed: XCircle,
+  };
+
+  const typeColors = {
+    full: 'info',
+    partial: 'warning',
+  } as const;
 
   return (
     <div className="space-y-6">
