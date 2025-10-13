@@ -16,10 +16,6 @@ import { format } from 'date-fns';
 export default function InventoryAdjustments() {
   const { profile } = useAuth();
   const { can } = usePermissions();
-
-  if (!can('inventory_adjustments')) {
-    return null;
-  }
   const [adjustments, setAdjustments] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -459,6 +455,10 @@ export default function InventoryAdjustments() {
       setFormData({...formData, cost_impact: suggestedCost});
     }
   };
+
+  if (!can('inventory_adjustments')) {
+    return null;
+  }
 
   if (loading) {
     return (

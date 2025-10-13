@@ -29,7 +29,7 @@ type DashboardStats = {
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
     const [orders, customers, agents, products] = await Promise.all([
-      supabase.from('orders').select('status, total'),
+      supabase.from('orders').select('status, order_total'),
       supabase.from('users').select('id').eq('role', 'customer'),
       supabase.from('users').select('id').eq('role', 'delivery_agent'),
       supabase.from('products').select('id, is_active')
@@ -37,7 +37,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     const totalRevenue = orders.data
       ?.filter(o => o.status === 'delivered')
-      .reduce((sum, o) => sum + (Number(o.total) || 0), 0) || 0;
+      .reduce((sum, o) => sum + (Number(o.order_total) || 0), 0) || 0;
 
     return {
       totalOrders: orders.data?.length || 0,
@@ -225,14 +225,18 @@ export async function deleteProductVariant(variantId: string) {
 export async function fetchCategories() {
   const { data, error } = await supabase
     .from('categories')
-    .select('id, name, description, parent_id, image_url, is_active, display_order, created_at, updated_at')
-    .order('display_order', { ascending: true });
+    .select('id, name, type, parent_id, created_at, updated_at')
+    .order('name', { ascending: true });
 
   if (data && !error) {
     return {
       data: data.map(cat => ({
         ...cat,
-        parent_category_id: cat.parent_id
+        parent_category_id: cat.parent_id,
+        description: '',
+        image_url: '',
+        is_active: true,
+        display_order: 0
       })),
       error
     };
