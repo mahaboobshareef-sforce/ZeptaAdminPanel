@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, AlertCircle, CheckCircle, Clock, Search, Filter, Eye, RefreshCw } from 'lucide-react';
+import { MessageSquare, Plus, Search, Phone, User, Mail, Package, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/UI/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/UI/Table';
 import Badge from '../components/UI/Badge';
@@ -7,83 +7,57 @@ import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Button from '../components/UI/Button';
 import Input from '../components/UI/Input';
 import Select from '../components/UI/Select';
-import Modal from '../components/UI/Modal';
+import Modal, { ModalBody, ModalFooter } from '../components/UI/Modal';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../hooks/usePermissions';
 
-type TicketStatus = 'open' | 'in_progress' | 'awaiting_customer' | 'resolved' | 'closed';
-type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
-type IssueType = 'damaged_product' | 'spoiled_product' | 'missing_items' | 'wrong_items' | 'delivery_issue' | 'quality_issue' | 'quantity_mismatch' | 'packaging_issue' | 'late_delivery' | 'other';
+const priorityOptions = [
+  { value: 'low', label: 'Low Priority' },
+  { value: 'medium', label: 'Medium Priority' },
+  { value: 'high', label: 'High Priority' },
+  { value: 'urgent', label: 'Urgent' }
+];
 
-interface SupportTicket {
-  id: string;
-  ticket_number: string;
-  order_id: string | null;
-  customer_id: string;
-  issue_type: IssueType;
-  priority: TicketPriority;
-  status: TicketStatus;
-  subject: string;
-  description: string;
-  affected_items: any[];
-  resolution_type: string | null;
-  resolution_notes: string | null;
-  refund_amount: number | null;
-  resolved_by: string | null;
-  resolved_at: string | null;
-  created_at: string;
-  updated_at: string;
-  customer?: {
-    email: string;
-    full_name: string;
-    phone: string;
-  };
-  order?: {
-    id: string;
-    order_total: number;
-  };
-}
+const categoryOptions = [
+  { value: 'order_issue', label: 'Order Issue' },
+  { value: 'delivery_issue', label: 'Delivery Issue' },
+  { value: 'product_quality', label: 'Product Quality' },
+  { value: 'payment_issue', label: 'Payment Issue' },
+  { value: 'refund_request', label: 'Refund Request' },
+  { value: 'general_inquiry', label: 'General Inquiry' },
+  { value: 'other', label: 'Other' }
+];
 
-interface TicketMessage {
-  id: string;
-  ticket_id: string;
-  sender_id: string;
-  sender_type: 'customer' | 'admin' | 'system';
-  message: string;
-  is_internal_note: boolean;
-  created_at: string;
-  sender?: {
-    email: string;
-    full_name: string;
-  };
-}
-
-interface TicketAttachment {
-  id: string;
-  ticket_id: string;
-  file_url: string;
-  file_type: string;
-  file_name: string | null;
-  created_at: string;
-}
+const statusOptions = [
+  { value: 'all', label: 'All Status' },
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' }
+];
 
 export default function SupportTickets() {
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const { can, loading: permissionsLoading } = usePermissions();
+  const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
-  const [messages, setMessages] = useState<TicketMessage[]>([]);
-  const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [newMessage, setNewMessage] = useState('');
-  const [isInternalNote, setIsInternalNote] = useState(false);
-  const [resolutionData, setResolutionData] = useState({
-    resolution_type: '',
-    resolution_notes: '',
-    refund_amount: ''
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Create ticket modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [searchMobile, setSearchMobile] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<any | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [ticketForm, setTicketForm] = useState({
+    subject: '',
+    category: 'order_issue',
+    priority: 'medium',
+    description: ''
   });
 
   useEffect(() => {
@@ -95,254 +69,182 @@ export default function SupportTickets() {
       setLoading(true);
       const { data, error } = await supabase
         .from('support_tickets')
-        .select('*')
+        .select(`
+          *,
+          customer:users!customer_id(full_name, email, mobile_number),
+          order:orders!order_id(order_number, order_total, status)
+        `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      // Fetch related data separately
-      if (data && data.length > 0) {
-        const customerIds = [...new Set(data.map(t => t.customer_id))];
-        const orderIds = [...new Set(data.map(t => t.order_id).filter(Boolean))];
-
-        const [customersRes, ordersRes] = await Promise.all([
-          supabase.from('users').select('id, email, full_name, phone').in('id', customerIds),
-          orderIds.length > 0
-            ? supabase.from('orders').select('id, order_total').in('id', orderIds)
-            : Promise.resolve({ data: [], error: null })
-        ]);
-
-        // Map customers and orders to tickets
-        const customersMap = new Map(customersRes.data?.map(c => [c.id, c]) || []);
-        const ordersMap = new Map(ordersRes.data?.map(o => [o.id, o]) || []);
-
-        const enrichedData = data.map(ticket => ({
-          ...ticket,
-          customer: customersMap.get(ticket.customer_id),
-          order: ticket.order_id ? ordersMap.get(ticket.order_id) : null
-        }));
-
-        setTickets(enrichedData);
-      } else {
-        setTickets([]);
-      }
-    } catch (error) {
-      console.error('Error loading tickets:', error);
+      if (error) throw error;
+      setTickets(data || []);
+    } catch (err) {
+      console.error('Error loading tickets:', err);
       toast.error('Failed to load support tickets');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadTicketDetails = async (ticketId: string) => {
+  const searchCustomerOrders = async () => {
+    if (!searchMobile || searchMobile.length < 10) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
     try {
-      const [messagesRes, attachmentsRes] = await Promise.all([
-        supabase
-          .from('ticket_messages')
-          .select('*')
-          .eq('ticket_id', ticketId)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('ticket_attachments')
-          .select('*')
-          .eq('ticket_id', ticketId)
-          .order('created_at', { ascending: true })
-      ]);
+      setSearching(true);
+      setCustomerOrders([]);
+      setCustomerInfo(null);
+      setSelectedOrder(null);
 
-      if (messagesRes.error) throw messagesRes.error;
-      if (attachmentsRes.error) throw attachmentsRes.error;
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, full_name, email, mobile_number')
+        .eq('mobile_number', searchMobile)
+        .maybeSingle();
 
-      // Fetch sender details for messages
-      const messages = messagesRes.data || [];
-      if (messages.length > 0) {
-        const senderIds = [...new Set(messages.map(m => m.sender_id))];
-        const { data: senders } = await supabase
-          .from('users')
-          .select('id, email, full_name')
-          .in('id', senderIds);
+      if (userError) throw userError;
 
-        const sendersMap = new Map(senders?.map(s => [s.id, s]) || []);
-        const enrichedMessages = messages.map(msg => ({
-          ...msg,
-          sender: sendersMap.get(msg.sender_id)
-        }));
+      if (!userData) {
+        toast.error('No customer found with this mobile number');
+        return;
+      }
 
-        setMessages(enrichedMessages);
+      setCustomerInfo(userData);
+
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          store:stores!store_id(name)
+        `)
+        .eq('customer_id', userData.id)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) throw ordersError;
+
+      setCustomerOrders(ordersData || []);
+
+      if (ordersData && ordersData.length === 0) {
+        toast('Customer found, but no orders yet', { icon: 'ℹ️' });
       } else {
-        setMessages([]);
+        toast.success(`Found ${ordersData?.length || 0} orders`);
       }
 
-      setAttachments(attachmentsRes.data || []);
-    } catch (error) {
-      console.error('Error loading ticket details:', error);
-      toast.error('Failed to load ticket details');
+    } catch (err) {
+      console.error('Search error:', err);
+      toast.error('Failed to search customer');
+    } finally {
+      setSearching(false);
     }
   };
 
-  const openTicketDetail = async (ticket: SupportTicket) => {
-    setSelectedTicket(ticket);
-    setShowDetailModal(true);
-    await loadTicketDetails(ticket.id);
-  };
-
-  const updateTicketStatus = async (ticketId: string, newStatus: TicketStatus) => {
-    try {
-      const updates: any = { status: newStatus };
-
-      if (newStatus === 'resolved' || newStatus === 'closed') {
-        const { data: userData } = await supabase.auth.getUser();
-        updates.resolved_by = userData.user?.id;
-        updates.resolved_at = new Date().toISOString();
-      }
-
-      const { error } = await supabase
-        .from('support_tickets')
-        .update(updates)
-        .eq('id', ticketId);
-
-      if (error) throw error;
-
-      toast.success('Ticket status updated');
-      loadTickets();
-
-      if (selectedTicket?.id === ticketId) {
-        setSelectedTicket({ ...selectedTicket, ...updates });
-      }
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update ticket status');
-    }
-  };
-
-  const updateTicketPriority = async (ticketId: string, newPriority: TicketPriority) => {
-    try {
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({ priority: newPriority })
-        .eq('id', ticketId);
-
-      if (error) throw error;
-
-      toast.success('Priority updated');
-      loadTickets();
-    } catch (error) {
-      console.error('Error updating priority:', error);
-      toast.error('Failed to update priority');
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedTicket) return;
-
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-
-      const { error } = await supabase
-        .from('ticket_messages')
-        .insert({
-          ticket_id: selectedTicket.id,
-          sender_id: userData.user?.id,
-          sender_type: 'admin',
-          message: newMessage.trim(),
-          is_internal_note: isInternalNote
-        });
-
-      if (error) throw error;
-
-      setNewMessage('');
-      setIsInternalNote(false);
-      toast.success(isInternalNote ? 'Internal note added' : 'Message sent');
-      await loadTicketDetails(selectedTicket.id);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message');
-    }
-  };
-
-  const resolveTicket = async () => {
-    if (!selectedTicket) return;
-
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({
-          status: 'resolved',
-          resolution_type: resolutionData.resolution_type || null,
-          resolution_notes: resolutionData.resolution_notes || null,
-          refund_amount: resolutionData.refund_amount ? parseFloat(resolutionData.refund_amount) : null,
-          resolved_by: userData.user?.id,
-          resolved_at: new Date().toISOString()
-        })
-        .eq('id', selectedTicket.id);
-
-      if (error) throw error;
-
-      toast.success('Ticket resolved successfully');
-      setShowDetailModal(false);
-      loadTickets();
-      setResolutionData({ resolution_type: '', resolution_notes: '', refund_amount: '' });
-    } catch (error) {
-      console.error('Error resolving ticket:', error);
-      toast.error('Failed to resolve ticket');
-    }
-  };
-
-  const getFilteredTickets = () => {
-    return tickets.filter(ticket => {
-      const matchesSearch =
-        ticket.ticket_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ticket.customer?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ticket.customer?.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
-      const matchesPriority = priorityFilter === 'all' || ticket.priority === priorityFilter;
-
-      return matchesSearch && matchesStatus && matchesPriority;
+  const selectOrder = (order: any) => {
+    setSelectedOrder(order);
+    setTicketForm({
+      ...ticketForm,
+      subject: `Issue with Order #${order.order_number}`
     });
   };
 
-  const getStatusBadge = (status: TicketStatus) => {
-    const variants: Record<TicketStatus, 'success' | 'warning' | 'error' | 'info'> = {
-      open: 'error',
-      in_progress: 'warning',
-      awaiting_customer: 'info',
-      resolved: 'success',
-      closed: 'success'
-    };
-    return <Badge variant={variants[status]}>{status.replace('_', ' ')}</Badge>;
+  const submitTicket = async () => {
+    if (!customerInfo) {
+      toast.error('Please search for a customer first');
+      return;
+    }
+
+    if (!ticketForm.subject || !ticketForm.description) {
+      toast.error('Please fill in subject and description');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const ticketData = {
+        customer_id: customerInfo.id,
+        order_id: selectedOrder?.id || null,
+        subject: ticketForm.subject,
+        category: ticketForm.category,
+        priority: ticketForm.priority,
+        description: ticketForm.description,
+        status: 'open',
+        issue_type: ticketForm.category
+      };
+
+      const { data, error } = await supabase
+        .from('support_tickets')
+        .insert([ticketData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Support ticket created successfully!');
+      setShowCreateModal(false);
+      resetCreateForm();
+      loadTickets();
+
+    } catch (err) {
+      console.error('Failed to create ticket:', err);
+      toast.error('Failed to create support ticket');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const getPriorityBadge = (priority: TicketPriority) => {
-    const variants: Record<TicketPriority, 'success' | 'warning' | 'error' | 'info'> = {
-      low: 'success',
-      medium: 'info',
-      high: 'warning',
-      critical: 'error'
-    };
-    return <Badge variant={variants[priority]}>{priority}</Badge>;
+  const resetCreateForm = () => {
+    setSearchMobile('');
+    setCustomerInfo(null);
+    setCustomerOrders([]);
+    setSelectedOrder(null);
+    setTicketForm({
+      subject: '',
+      category: 'order_issue',
+      priority: 'medium',
+      description: ''
+    });
   };
 
-  const getIssueTypeLabel = (type: IssueType) => {
-    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return 'warning';
+      case 'in_progress': return 'info';
+      case 'resolved': return 'success';
+      case 'closed': return 'default';
+      default: return 'default';
+    }
   };
 
-  const stats = {
-    open: tickets.filter(t => t.status === 'open').length,
-    inProgress: tickets.filter(t => t.status === 'in_progress').length,
-    resolved: tickets.filter(t => ['resolved', 'closed'].includes(t.status)).length,
-    critical: tickets.filter(t => t.priority === 'critical' && !['resolved', 'closed'].includes(t.status)).length
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'error';
+      case 'high': return 'warning';
+      case 'medium': return 'info';
+      case 'low': return 'default';
+      default: return 'default';
+    }
   };
+
+  const filteredTickets = tickets.filter(ticket => {
+    if (statusFilter === 'all') return true;
+    return ticket.status === statusFilter;
+  });
+
+  if (permissionsLoading) {
+    return null;
+  }
+
+  if (!can('manage_support')) {
+    return null;
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <LoadingSpinner size="lg" />
+        <p className="text-gray-600">Loading support tickets...</p>
       </div>
     );
   }
@@ -351,343 +253,245 @@ export default function SupportTickets() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customer Support</h1>
-          <p className="text-gray-600 mt-1">Manage customer issues and complaints</p>
+          <h1 className="text-3xl font-bold text-gray-900">Support Tickets</h1>
+          <p className="text-gray-600">Manage customer support tickets and issues</p>
         </div>
-        <Button onClick={loadTickets} variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
+        <Button onClick={() => setShowCreateModal(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Ticket
         </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Open Tickets</p>
-                <p className="text-2xl font-bold text-red-600">{stats.open}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Resolved</p>
-                <p className="text-2xl font-bold text-green-600">{stats.resolved}</p>
-              </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Critical</p>
-                <p className="text-2xl font-bold text-red-700">{stats.critical}</p>
-              </div>
-              <AlertCircle className="w-8 h-8 text-red-700" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search tickets, customers, or subjects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                icon={Search}
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center">
+              <MessageSquare className="mr-2 h-5 w-5" />
+              All Tickets ({filteredTickets.length})
+            </CardTitle>
+            <div className="w-48">
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                options={statusOptions}
               />
             </div>
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All Status</option>
-              <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
-              <option value="awaiting_customer">Awaiting Customer</option>
-              <option value="resolved">Resolved</option>
-              <option value="closed">Closed</option>
-            </Select>
-            <Select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              <option value="all">All Priority</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </Select>
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ticket #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Issue Type</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {getFilteredTickets().map((ticket) => (
-                <TableRow key={ticket.id}>
-                  <TableCell className="font-mono text-sm">{ticket.ticket_number}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{ticket.customer?.full_name || 'N/A'}</div>
-                      <div className="text-sm text-gray-500">{ticket.customer?.email}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getIssueTypeLabel(ticket.issue_type)}</TableCell>
-                  <TableCell className="max-w-xs truncate">{ticket.subject}</TableCell>
-                  <TableCell>{getPriorityBadge(ticket.priority)}</TableCell>
-                  <TableCell>{getStatusBadge(ticket.status)}</TableCell>
-                  <TableCell>{format(new Date(ticket.created_at), 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openTicketDetail(ticket)}
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {getFilteredTickets().length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No support tickets found</p>
+          {filteredTickets.length === 0 ? (
+            <div className="text-center py-12">
+              <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No tickets found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Create a new support ticket to get started
+              </p>
             </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ticket #</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTickets.map((ticket) => (
+                  <TableRow key={ticket.id}>
+                    <TableCell className="font-medium">
+                      {ticket.ticket_number || `#${ticket.id.slice(0, 8)}`}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{ticket.customer?.full_name || 'N/A'}</p>
+                        <p className="text-sm text-gray-500">{ticket.customer?.email || ''}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{ticket.subject}</TableCell>
+                    <TableCell>
+                      {ticket.order ? `#${ticket.order.order_number}` : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getPriorityColor(ticket.priority)}>
+                        {ticket.priority}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusColor(ticket.status)}>
+                        {ticket.status?.replace(/_/g, ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(ticket.created_at), 'MMM dd, yyyy')}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
 
+      {/* Create Ticket Modal */}
       <Modal
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        title={`Ticket ${selectedTicket?.ticket_number}`}
-        size="xl"
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          resetCreateForm();
+        }}
+        title="Create Support Ticket"
       >
-        {selectedTicket && (
+        <ModalBody>
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Customer</p>
-                <p className="font-medium">{selectedTicket.customer?.full_name}</p>
-                <p className="text-sm text-gray-500">{selectedTicket.customer?.email}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Order ID</p>
-                <p className="font-mono text-sm">{selectedTicket.order_id || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Issue Type</p>
-                <p className="font-medium">{getIssueTypeLabel(selectedTicket.issue_type)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Created</p>
-                <p className="font-medium">{format(new Date(selectedTicket.created_at), 'PPpp')}</p>
-              </div>
-            </div>
-
+            {/* Step 1: Search Customer */}
             <div>
-              <h3 className="font-semibold mb-2">Subject</h3>
-              <p className="text-gray-700">{selectedTicket.subject}</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-2">Description</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{selectedTicket.description}</p>
-            </div>
-
-            {attachments.length > 0 && (
-              <div>
-                <h3 className="font-semibold mb-2">Evidence Photos</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {attachments.map((att) => (
-                    <img
-                      key={att.id}
-                      src={att.file_url}
-                      alt="Evidence"
-                      className="w-full h-32 object-cover rounded border"
-                    />
-                  ))}
+              <h3 className="text-lg font-medium mb-4">1. Search Customer</h3>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <Input
+                    label="Customer Mobile Number"
+                    placeholder="Enter 10-digit mobile number"
+                    value={searchMobile}
+                    onChange={setSearchMobile}
+                    icon={Phone}
+                  />
                 </div>
-              </div>
-            )}
-
-            <div>
-              <h3 className="font-semibold mb-3">Communication</h3>
-              <div className="space-y-3 max-h-96 overflow-y-auto border rounded-lg p-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`p-3 rounded-lg ${
-                      msg.sender_type === 'customer'
-                        ? 'bg-blue-50 ml-8'
-                        : msg.is_internal_note
-                        ? 'bg-yellow-50 border border-yellow-200'
-                        : 'bg-gray-50 mr-8'
-                    }`}
+                <div className="flex items-end">
+                  <Button
+                    onClick={searchCustomerOrders}
+                    disabled={searching || !searchMobile}
                   >
-                    <div className="flex justify-between items-start mb-1">
-                      <p className="text-sm font-medium">
-                        {msg.sender_type === 'customer' ? 'Customer' : msg.sender?.full_name || 'Admin'}
-                        {msg.is_internal_note && <span className="ml-2 text-yellow-600">(Internal Note)</span>}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {format(new Date(msg.created_at), 'MMM dd, HH:mm')}
-                      </p>
-                    </div>
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.message}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-2">Send Response</h3>
-              <textarea
-                className="w-full border rounded-lg p-3 min-h-24"
-                placeholder="Type your message..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-              />
-              <div className="flex items-center justify-between mt-2">
-                <label className="flex items-center text-sm">
-                  <input
-                    type="checkbox"
-                    checked={isInternalNote}
-                    onChange={(e) => setIsInternalNote(e.target.checked)}
-                    className="mr-2"
-                  />
-                  Internal note (customer won't see this)
-                </label>
-                <Button onClick={sendMessage} disabled={!newMessage.trim()}>
-                  Send Message
-                </Button>
-              </div>
-            </div>
-
-            <div className="border-t pt-4">
-              <h3 className="font-semibold mb-3">Update Status</h3>
-              <div className="flex gap-2 mb-4">
-                <Select
-                  value={selectedTicket.status}
-                  onChange={(e) => updateTicketStatus(selectedTicket.id, e.target.value as TicketStatus)}
-                  className="flex-1"
-                >
-                  <option value="open">Open</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="awaiting_customer">Awaiting Customer</option>
-                  <option value="resolved">Resolved</option>
-                  <option value="closed">Closed</option>
-                </Select>
-                <Select
-                  value={selectedTicket.priority}
-                  onChange={(e) => updateTicketPriority(selectedTicket.id, e.target.value as TicketPriority)}
-                  className="flex-1"
-                >
-                  <option value="low">Low Priority</option>
-                  <option value="medium">Medium Priority</option>
-                  <option value="high">High Priority</option>
-                  <option value="critical">Critical</option>
-                </Select>
-              </div>
-            </div>
-
-            {!['resolved', 'closed'].includes(selectedTicket.status) && (
-              <div className="border-t pt-4">
-                <h3 className="font-semibold mb-3">Resolve Ticket</h3>
-                <div className="space-y-3">
-                  <Select
-                    value={resolutionData.resolution_type}
-                    onChange={(e) => setResolutionData({ ...resolutionData, resolution_type: e.target.value })}
-                  >
-                    <option value="">Select resolution type</option>
-                    <option value="full_refund">Full Refund</option>
-                    <option value="partial_refund">Partial Refund</option>
-                    <option value="replacement">Replacement</option>
-                    <option value="store_credit">Store Credit</option>
-                    <option value="no_action">No Action Required</option>
-                    <option value="other">Other</option>
-                  </Select>
-                  {['full_refund', 'partial_refund', 'store_credit'].includes(resolutionData.resolution_type) && (
-                    <Input
-                      type="number"
-                      placeholder="Refund/Credit Amount"
-                      value={resolutionData.refund_amount}
-                      onChange={(e) => setResolutionData({ ...resolutionData, refund_amount: e.target.value })}
-                    />
-                  )}
-                  <textarea
-                    className="w-full border rounded-lg p-3 min-h-20"
-                    placeholder="Resolution notes..."
-                    value={resolutionData.resolution_notes}
-                    onChange={(e) => setResolutionData({ ...resolutionData, resolution_notes: e.target.value })}
-                  />
-                  <Button onClick={resolveTicket} variant="primary" className="w-full">
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Resolve Ticket
+                    {searching ? 'Searching...' : 'Search'}
                   </Button>
                 </div>
               </div>
+            </div>
+
+            {/* Customer Info */}
+            {customerInfo && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-900 mb-2">Customer Found</h4>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Name</p>
+                    <p className="font-medium">{customerInfo.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Email</p>
+                    <p className="font-medium">{customerInfo.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Mobile</p>
+                    <p className="font-medium">{customerInfo.mobile_number}</p>
+                  </div>
+                </div>
+              </div>
             )}
 
-            {selectedTicket.resolution_notes && (
-              <div className="border-t pt-4 bg-green-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-green-900 mb-2">Resolution</h3>
-                <p className="text-sm text-green-800">
-                  <strong>Type:</strong> {selectedTicket.resolution_type?.replace('_', ' ')}
-                </p>
-                {selectedTicket.refund_amount && (
-                  <p className="text-sm text-green-800">
-                    <strong>Amount:</strong> ₹{selectedTicket.refund_amount}
-                  </p>
-                )}
-                <p className="text-sm text-green-800 mt-2">{selectedTicket.resolution_notes}</p>
-                <p className="text-xs text-green-600 mt-2">
-                  Resolved on {format(new Date(selectedTicket.resolved_at!), 'PPpp')}
-                </p>
+            {/* Step 2: Select Order (Optional) */}
+            {customerOrders.length > 0 && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">2. Select Order (Optional)</h3>
+                <div className="max-h-48 overflow-y-auto border rounded-lg">
+                  {customerOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      onClick={() => selectOrder(order)}
+                      className={`p-3 border-b cursor-pointer hover:bg-gray-50 ${
+                        selectedOrder?.id === order.id ? 'bg-blue-50 border-blue-500' : ''
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">Order #{order.order_number}</p>
+                          <p className="text-sm text-gray-500">
+                            {format(new Date(order.created_at), 'MMM dd, yyyy')} • ₹{order.order_total}
+                          </p>
+                        </div>
+                        <Badge variant={selectedOrder?.id === order.id ? 'success' : 'default'}>
+                          {order.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setSelectedOrder(null)}
+                >
+                  Clear Selection (General Ticket)
+                </Button>
+              </div>
+            )}
+
+            {/* Step 3: Ticket Details */}
+            {customerInfo && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">3. Ticket Details</h3>
+                <div className="space-y-4">
+                  <Input
+                    label="Subject *"
+                    placeholder="Brief description of the issue"
+                    value={ticketForm.subject}
+                    onChange={(value) => setTicketForm({ ...ticketForm, subject: value })}
+                  />
+
+                  <Select
+                    label="Category"
+                    value={ticketForm.category}
+                    onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
+                    options={categoryOptions}
+                  />
+
+                  <Select
+                    label="Priority"
+                    value={ticketForm.priority}
+                    onChange={(e) => setTicketForm({ ...ticketForm, priority: e.target.value })}
+                    options={priorityOptions}
+                  />
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description *
+                    </label>
+                    <textarea
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={4}
+                      placeholder="Detailed description of the issue..."
+                      value={ticketForm.description}
+                      onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowCreateModal(false);
+              resetCreateForm();
+            }}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={submitTicket}
+            disabled={submitting || !customerInfo || !ticketForm.subject || !ticketForm.description}
+          >
+            {submitting ? 'Creating...' : 'Create Ticket'}
+          </Button>
+        </ModalFooter>
       </Modal>
     </div>
   );

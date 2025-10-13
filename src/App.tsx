@@ -25,7 +25,6 @@ import Ratings from './pages/Ratings';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import SupportTickets from './pages/SupportTickets';
-import CreateServiceTicket from './pages/CreateServiceTicket';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 
 const queryClient = new QueryClient({
@@ -118,14 +117,6 @@ function AppRoutes() {
         />
         <Route path="/ratings" element={<Ratings />} />
         <Route path="/support-tickets" element={<SupportTickets />} />
-        <Route
-          path="/create-service-ticket"
-          element={
-            <ProtectedRoute permission="manage_support_tickets">
-              <CreateServiceTicket />
-            </ProtectedRoute>
-          }
-        />
         <Route path="/notifications" element={<div className="p-6">Notifications - Coming Soon</div>} />
         <Route path="/analytics" element={<Analytics />} />
         <Route

@@ -19,7 +19,6 @@ import {
   TrendingUp,
   AlertTriangle,
   MessageSquare,
-  PlusCircle,
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import type { Permission } from '../../config/permissions';
@@ -45,8 +44,7 @@ const navigation: Array<{
   { name: 'Payments', href: '/payments', icon: Receipt, permission: 'view_payments' },
   { name: 'Refunds', href: '/refunds', icon: RefreshCw, permission: 'manage_refunds' },
   { name: 'Ratings', href: '/ratings', icon: Star, permission: 'view_ratings' },
-  { name: 'Support Tickets', href: '/support-tickets', icon: MessageSquare, permission: 'manage_support_tickets' },
-  { name: 'Create Service Ticket', href: '/create-service-ticket', icon: PlusCircle, permission: 'manage_support_tickets' },
+  { name: 'Support Tickets', href: '/support-tickets', icon: MessageSquare, permission: 'manage_support' },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'view_analytics' },
   { name: 'Profit Analysis', href: '/profit-analysis', icon: TrendingUp, permission: 'view_profit_analysis' },
   { name: 'Settings', href: '/settings', icon: Settings, permission: 'manage_settings' },
