@@ -61,7 +61,6 @@ Deno.serve(async (req: Request) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
-      email_confirm: true,
       app_metadata: {
         role: 'delivery_agent',
       },
@@ -74,8 +73,10 @@ Deno.serve(async (req: Request) => {
       console.error('Auth error:', authError);
       return new Response(
         JSON.stringify({
-          error: 'Failed to create delivery agent: ' + (authError.message || 'Unknown error'),
-          details: authError
+          error: 'Failed to create delivery agent',
+          details: authError.message || 'Unknown error',
+          code: authError.code || 'UNKNOWN',
+          fullError: JSON.stringify(authError)
         }),
         {
           status: 400,
@@ -145,18 +146,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-      options: {
-        redirectTo: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`,
-      },
-    });
-
-    if (resetError) {
-      console.error('Failed to send invitation email:', resetError);
-    }
-
     const { data: userData } = await supabaseAdmin
       .from('users')
       .select('*')
@@ -166,7 +155,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         data: userData,
-        message: 'Delivery agent created successfully. Invitation email sent.',
+        message: 'Delivery agent created successfully',
       }),
       {
         status: 200,
@@ -176,7 +165,10 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({
+        error: 'Internal server error',
+        details: error.message || 'Unknown error'
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
