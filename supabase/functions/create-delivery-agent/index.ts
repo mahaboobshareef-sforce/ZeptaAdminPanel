@@ -75,7 +75,10 @@ Deno.serve(async (req: Request) => {
     if (authError) {
       console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ error: authError.message || 'Failed to create auth user' }),
+        JSON.stringify({
+          error: 'Failed to create delivery agent: ' + (authError.message || 'Unknown error'),
+          details: authError
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -93,6 +96,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Wait a moment for trigger to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     // Update mobile_number and store_id (trigger creates basic user record)
     const { error: updateError } = await supabaseAdmin
       .from('users')
@@ -104,6 +110,16 @@ Deno.serve(async (req: Request) => {
 
     if (updateError) {
       console.error('User update error:', updateError);
+      return new Response(
+        JSON.stringify({
+          error: 'Database error creating new user',
+          details: updateError.message
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Send password reset email (invitation)
