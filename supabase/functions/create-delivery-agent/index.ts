@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check if user already exists in public.users (use maybeSingle to avoid error if not found)
+    // Check if user already exists
     const { data: existingPublicUser } = await supabaseAdmin
       .from('users')
       .select('id, email, role')
@@ -48,8 +48,8 @@ Deno.serve(async (req: Request) => {
 
     if (existingPublicUser) {
       return new Response(
-        JSON.stringify({ 
-          error: `A user with email ${email} already exists with role: ${existingPublicUser.role}` 
+        JSON.stringify({
+          error: `A user with email ${email} already exists with role: ${existingPublicUser.role}`
         }),
         {
           status: 409,
@@ -58,26 +58,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check if user exists in auth.users
-    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers();
-    const authUserExists = existingAuthUser?.users?.find(u => u.email === email);
+    // Generate secure random password
+    const tempPassword = `Agent${Math.random().toString(36).slice(-8)}@${Date.now().toString(36)}`;
 
-    if (authUserExists) {
-      return new Response(
-        JSON.stringify({ 
-          error: `An auth user with email ${email} already exists but is not in the users table. Please contact support.` 
-        }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Create auth user
+    // Create auth user (trigger will create user record automatically)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: 'DeliveryAgent@123',
+      password: tempPassword,
       email_confirm: true,
       user_metadata: {
         full_name,
@@ -106,40 +93,44 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create user record in public.users
-    const { data: userData, error: userError } = await supabaseAdmin
+    // Update mobile_number and store_id (trigger creates basic user record)
+    const { error: updateError } = await supabaseAdmin
       .from('users')
-      .insert({
-        id: authData.user.id,
-        full_name,
-        email,
+      .update({
         mobile_number,
-        role: 'delivery_agent',
         store_id: store_id || null,
-        is_active: true,
       })
-      .select()
-      .single();
+      .eq('id', authData.user.id);
 
-    if (userError) {
-      console.error('User creation error:', userError);
-      // Try to clean up auth user if user record creation fails
-      try {
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      } catch (cleanupError) {
-        console.error('Failed to cleanup auth user:', cleanupError);
-      }
-      return new Response(
-        JSON.stringify({ error: userError.message || 'Failed to create user record' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (updateError) {
+      console.error('User update error:', updateError);
     }
 
+    // Send password reset email (invitation)
+    const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+      options: {
+        redirectTo: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify`,
+      },
+    });
+
+    if (resetError) {
+      console.error('Failed to send invitation email:', resetError);
+    }
+
+    // Fetch the created user
+    const { data: userData } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
     return new Response(
-      JSON.stringify({ data: userData }),
+      JSON.stringify({
+        data: userData,
+        message: 'Delivery agent created successfully. Invitation email sent.',
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

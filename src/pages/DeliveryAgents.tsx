@@ -105,23 +105,25 @@ export default function DeliveryAgents() {
 
   const handleCreateAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     try {
       const result = await createDeliveryAgent({
         ...formData,
         store_id: formData.store_id || undefined
       });
-      
+
       if (result.error) {
         throw new Error(result.error.message || 'Failed to create delivery agent');
       }
-      
+
       setShowCreateModal(false);
       resetForm();
       await loadData();
-      
+
+      alert('✅ Delivery agent created successfully!\n\nAn invitation email has been sent to set up their password.');
+
     } catch (err) {
       alert(`Failed to create delivery agent: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
