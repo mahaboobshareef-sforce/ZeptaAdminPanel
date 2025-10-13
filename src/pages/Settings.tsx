@@ -1,19 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, User, Bell, Shield, Database, Mail, Globe } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/UI/Card';
 import Button from '../components/UI/Button';
 import Input from '../components/UI/Input';
 import Select from '../components/UI/Select';
+import Badge from '../components/UI/Badge';
+import LoadingSpinner from '../components/UI/LoadingSpinner';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 export default function Settings() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security' | 'system'>('profile');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [profileData, setProfileData] = useState({
     full_name: profile?.full_name || '',
     email: profile?.email || '',
     mobile_number: profile?.mobile_number || ''
   });
+
   const [notificationSettings, setNotificationSettings] = useState({
     email_notifications: true,
     sms_notifications: false,
@@ -21,13 +29,181 @@ export default function Settings() {
     order_updates: true,
     marketing_emails: false
   });
+
   const [systemSettings, setSystemSettings] = useState({
     timezone: 'Asia/Kolkata',
     currency: 'INR',
     language: 'en',
     date_format: 'DD/MM/YYYY',
-    items_per_page: '20'
+    items_per_page: '20',
+    dark_mode: false,
+    auto_refresh: true
   });
+
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadSettings();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (profile) {
+      setProfileData({
+        full_name: profile.full_name || '',
+        email: profile.email || '',
+        mobile_number: profile.mobile_number || ''
+      });
+    }
+  }, [profile]);
+
+  const loadSettings = async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading settings:', error);
+        return;
+      }
+
+      if (data) {
+        setSettingsId(data.id);
+        setNotificationSettings({
+          email_notifications: data.notification_email,
+          sms_notifications: data.notification_sms,
+          push_notifications: data.notification_push,
+          order_updates: data.notification_order_updates,
+          marketing_emails: data.notification_marketing
+        });
+        setSystemSettings({
+          timezone: data.timezone,
+          currency: data.currency,
+          language: data.language,
+          date_format: data.date_format,
+          items_per_page: String(data.items_per_page),
+          dark_mode: data.dark_mode,
+          auto_refresh: data.auto_refresh
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveNotificationSettings = async () => {
+    if (!user?.id) return;
+
+    try {
+      setSaving(true);
+      const settingsData = {
+        user_id: user.id,
+        notification_email: notificationSettings.email_notifications,
+        notification_sms: notificationSettings.sms_notifications,
+        notification_push: notificationSettings.push_notifications,
+        notification_order_updates: notificationSettings.order_updates,
+        notification_marketing: notificationSettings.marketing_emails
+      };
+
+      if (settingsId) {
+        const { error } = await supabase
+          .from('user_settings')
+          .update(settingsData)
+          .eq('id', settingsId);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .insert([settingsData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (data) setSettingsId(data.id);
+      }
+
+      toast.success('Notification preferences saved successfully!');
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+      toast.error('Failed to save notification preferences');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveSystemSettings = async () => {
+    if (!user?.id) return;
+
+    try {
+      setSaving(true);
+      const settingsData = {
+        user_id: user.id,
+        timezone: systemSettings.timezone,
+        currency: systemSettings.currency,
+        language: systemSettings.language,
+        date_format: systemSettings.date_format,
+        items_per_page: parseInt(systemSettings.items_per_page),
+        dark_mode: systemSettings.dark_mode,
+        auto_refresh: systemSettings.auto_refresh
+      };
+
+      if (settingsId) {
+        const { error } = await supabase
+          .from('user_settings')
+          .update(settingsData)
+          .eq('id', settingsId);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .insert([settingsData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (data) setSettingsId(data.id);
+      }
+
+      toast.success('System settings saved successfully!');
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+      toast.error('Failed to save system settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateProfile = async () => {
+    if (!user?.id) return;
+
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from('users')
+        .update({
+          full_name: profileData.full_name,
+          mobile_number: profileData.mobile_number
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      toast.success('Profile updated successfully!');
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      toast.error('Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
@@ -63,6 +239,15 @@ export default function Settings() {
     { value: '50', label: '50 items' },
     { value: '100', label: '100 items' }
   ];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <LoadingSpinner size="lg" />
+        <p className="text-gray-600">Loading settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -146,7 +331,9 @@ export default function Settings() {
                     />
                     
                     <div className="flex items-end">
-                      <Button>Update Profile</Button>
+                      <Button onClick={updateProfile} disabled={saving}>
+                        {saving ? 'Updating...' : 'Update Profile'}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -195,8 +382,10 @@ export default function Settings() {
                       ))}
                     </div>
                   </div>
-                  
-                  <Button>Save Preferences</Button>
+
+                  <Button onClick={saveNotificationSettings} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Preferences'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -316,7 +505,12 @@ export default function Settings() {
                           <p className="text-sm text-gray-500">Switch to dark theme</p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" />
+                          <input
+                            type="checkbox"
+                            checked={systemSettings.dark_mode}
+                            onChange={(e) => setSystemSettings({...systemSettings, dark_mode: e.target.checked})}
+                            className="sr-only peer"
+                          />
                           <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </label>
                       </div>
@@ -327,14 +521,21 @@ export default function Settings() {
                           <p className="text-sm text-gray-500">Automatically refresh dashboard data</p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" defaultChecked className="sr-only peer" />
+                          <input
+                            type="checkbox"
+                            checked={systemSettings.auto_refresh}
+                            onChange={(e) => setSystemSettings({...systemSettings, auto_refresh: e.target.checked})}
+                            className="sr-only peer"
+                          />
                           <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </label>
                       </div>
                     </div>
                   </div>
 
-                  <Button>Save Settings</Button>
+                  <Button onClick={saveSystemSettings} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save Settings'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
