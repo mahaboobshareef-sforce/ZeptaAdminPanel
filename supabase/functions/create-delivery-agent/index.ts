@@ -92,28 +92,48 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { error: insertError } = await supabaseAdmin
-      .from('users')
-      .upsert({
-        id: authData.user.id,
-        email,
-        full_name,
-        mobile_number,
-        role: 'delivery_agent',
-        store_id: store_id || null,
-        is_active: true,
-      }, {
-        onConflict: 'id',
-        ignoreDuplicates: false
-      });
+    let userInserted = false;
+    let insertError = null;
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    if (insertError) {
-      console.error('User insert error:', insertError);
+    while (!userInserted && attempts < maxAttempts) {
+      attempts++;
+
+      if (attempts > 1) {
+        await new Promise(resolve => setTimeout(resolve, attempts * 200));
+      }
+
+      const { error } = await supabaseAdmin
+        .from('users')
+        .upsert({
+          id: authData.user.id,
+          email,
+          full_name,
+          mobile_number,
+          role: 'delivery_agent',
+          store_id: store_id || null,
+          is_active: true,
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        });
+
+      if (!error) {
+        userInserted = true;
+      } else {
+        insertError = error;
+        console.error(`User insert error (attempt ${attempts}):`, error);
+      }
+    }
+
+    if (!userInserted && insertError) {
       return new Response(
         JSON.stringify({
           error: 'Database error creating new user',
           details: insertError.message,
-          code: insertError.code
+          code: insertError.code,
+          hint: insertError.hint
         }),
         {
           status: 500,

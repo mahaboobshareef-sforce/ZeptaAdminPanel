@@ -747,7 +747,10 @@ export async function createDeliveryAgent(agentData: Record<string, any>) {
     const result = await response.json();
 
     if (!response.ok) {
-      return { data: null, error: { message: result.error || 'Failed to create delivery agent' } };
+      const errorMessage = result.details
+        ? `${result.error}: ${result.details}${result.code ? ` (${result.code})` : ''}`
+        : result.error || 'Failed to create delivery agent';
+      return { data: null, error: { message: errorMessage } };
     }
 
     return { data: result.data, error: null };
