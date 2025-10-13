@@ -123,7 +123,7 @@ Deno.serve(async (req: Request) => {
         userInserted = true;
       } else {
         insertError = error;
-        console.error(`User insert error (attempt ${attempts}):`, error);
+        console.error(`User insert error (attempt ${attempts}):`, JSON.stringify(error, null, 2));
       }
     }
 
@@ -131,9 +131,10 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           error: 'Database error creating new user',
-          details: insertError.message,
-          code: insertError.code,
-          hint: insertError.hint
+          details: insertError.message || 'Unknown database error',
+          code: insertError.code || 'UNKNOWN',
+          hint: insertError.hint || 'No hint available',
+          fullError: JSON.stringify(insertError)
         }),
         {
           status: 500,
