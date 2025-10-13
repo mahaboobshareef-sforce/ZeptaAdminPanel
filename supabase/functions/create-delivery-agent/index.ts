@@ -62,9 +62,11 @@ Deno.serve(async (req: Request) => {
       email,
       password: tempPassword,
       email_confirm: true,
+      app_metadata: {
+        role: 'delivery_agent',
+      },
       user_metadata: {
         full_name,
-        role: 'delivery_agent',
       },
     });
 
