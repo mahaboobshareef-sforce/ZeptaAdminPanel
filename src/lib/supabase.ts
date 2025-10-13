@@ -67,17 +67,41 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function fetchOrders() {
-  const { data, error } = await supabase
+  const { data: orders, error } = await supabase
     .from('orders')
-    .select(`
-      *,
-      customer:users!customer_id(id, full_name, email, mobile_number),
-      store:stores!store_id(id, name),
-      delivery_agent:users!delivery_agent_id(id, full_name)
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
-  return { data, error };
+  if (error || !orders) {
+    return { data: orders, error };
+  }
+
+  const customerIds = [...new Set(orders.map(o => o.customer_id))];
+  const storeIds = [...new Set(orders.map(o => o.store_id).filter(Boolean))];
+  const agentIds = [...new Set(orders.map(o => o.delivery_agent_id).filter(Boolean))];
+
+  const [customersRes, storesRes, agentsRes] = await Promise.all([
+    supabase.from('users').select('id, full_name, email, mobile_number').in('id', customerIds),
+    storeIds.length > 0
+      ? supabase.from('stores').select('id, name').in('id', storeIds)
+      : Promise.resolve({ data: [], error: null }),
+    agentIds.length > 0
+      ? supabase.from('users').select('id, full_name').in('id', agentIds)
+      : Promise.resolve({ data: [], error: null })
+  ]);
+
+  const customersMap = new Map(customersRes.data?.map(c => [c.id, c]) || []);
+  const storesMap = new Map(storesRes.data?.map(s => [s.id, s]) || []);
+  const agentsMap = new Map(agentsRes.data?.map(a => [a.id, a]) || []);
+
+  const enrichedOrders = orders.map(order => ({
+    ...order,
+    customer: customersMap.get(order.customer_id),
+    store: order.store_id ? storesMap.get(order.store_id) : null,
+    delivery_agent: order.delivery_agent_id ? agentsMap.get(order.delivery_agent_id) : null
+  }));
+
+  return { data: enrichedOrders, error: null };
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
