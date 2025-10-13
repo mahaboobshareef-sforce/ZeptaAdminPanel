@@ -29,14 +29,6 @@ export default function ProfitAnalysis() {
   const [storeFilter, setStoreFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'profit' | 'margin' | 'revenue'>('profit');
 
-  useEffect(() => {
-    loadData();
-  }, [storeFilter]);
-
-  if (!can('view_profit_analysis')) {
-    return null;
-  }
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -118,6 +110,14 @@ export default function ProfitAnalysis() {
 
   const stats = getTotalStats();
   const overallMargin = stats.totalRevenue > 0 ? ((stats.totalProfit / stats.totalRevenue) * 100) : 0;
+
+  useEffect(() => {
+    loadData();
+  }, [storeFilter]);
+
+  if (!can('view_profit_analysis')) {
+    return null;
+  }
 
   const storeOptions = stores.map(store => ({
     value: store.id,

@@ -3,7 +3,7 @@ import { useAuth } from './useAuth';
 import { hasPermission, hasAnyPermission, Permission } from '../config/permissions';
 
 export function usePermissions() {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
 
   const permissions = useMemo(() => {
     if (!profile) {
@@ -12,6 +12,7 @@ export function usePermissions() {
         canAny: () => false,
         isSuperAdmin: false,
         isAdmin: false,
+        loading,
       };
     }
 
@@ -20,8 +21,9 @@ export function usePermissions() {
       canAny: (permissions: Permission[]) => hasAnyPermission(profile.role, permissions),
       isSuperAdmin: profile.role === 'super_admin',
       isAdmin: profile.role === 'admin',
+      loading: false,
     };
-  }, [profile]);
+  }, [profile, loading]);
 
   return permissions;
 }

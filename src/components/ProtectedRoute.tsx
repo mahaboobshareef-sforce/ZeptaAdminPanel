@@ -14,7 +14,11 @@ export default function ProtectedRoute({
   permission,
   fallback,
 }: ProtectedRouteProps) {
-  const { can } = usePermissions();
+  const { can, loading } = usePermissions();
+
+  if (loading) {
+    return null;
+  }
 
   if (!can(permission)) {
     if (fallback) {

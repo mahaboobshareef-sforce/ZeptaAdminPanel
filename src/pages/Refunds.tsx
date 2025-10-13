@@ -17,14 +17,6 @@ export default function Refunds() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    loadRefunds();
-  }, []);
-
-  if (!can('manage_refunds')) {
-    return null;
-  }
-
   const loadRefunds = async () => {
     try {
       setLoading(true);
@@ -57,9 +49,17 @@ export default function Refunds() {
     }
   };
 
-  const filteredRefunds = statusFilter === 'all' 
-    ? refunds 
+  useEffect(() => {
+    loadRefunds();
+  }, []);
+
+  const filteredRefunds = statusFilter === 'all'
+    ? refunds
     : refunds.filter(refund => refund.status === statusFilter);
+
+  if (!can('manage_refunds')) {
+    return null;
+  }
 
   const statusColors = {
     initiated: 'warning',
