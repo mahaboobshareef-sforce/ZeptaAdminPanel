@@ -67,14 +67,19 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function fetchOrders() {
+  console.log('📦 fetchOrders: Starting...');
+
   const { data: orders, error } = await supabase
     .from('orders')
     .select('*')
     .order('created_at', { ascending: false });
 
   if (error || !orders) {
+    console.error('❌ fetchOrders: Failed to load orders', error);
     return { data: orders, error };
   }
+
+  console.log(`📦 fetchOrders: Loaded ${orders.length} orders`);
 
   const orderIds = orders.map(o => o.id);
   const customerIds = [...new Set(orders.map(o => o.customer_id))];
@@ -92,7 +97,14 @@ export async function fetchOrders() {
       : Promise.resolve({ data: [], error: null })
   ]);
 
+  console.log(`📦 fetchOrders: Loaded ${orderItemsRes.data?.length || 0} order items`);
+
+  if (orderItemsRes.error) {
+    console.error('❌ fetchOrders: Failed to load order items', orderItemsRes.error);
+  }
+
   const variantIds = [...new Set(orderItemsRes.data?.map(item => item.variant_id).filter(Boolean) || [])];
+  console.log(`📦 fetchOrders: Found ${variantIds.length} unique variants`);
 
   const [variantsRes, productsRes] = await Promise.all([
     variantIds.length > 0
@@ -102,6 +114,8 @@ export async function fetchOrders() {
       ? supabase.from('products').select('*')
       : Promise.resolve({ data: [], error: null })
   ]);
+
+  console.log(`📦 fetchOrders: Loaded ${variantsRes.data?.length || 0} variants, ${productsRes.data?.length || 0} products`);
 
   const variantsMap = new Map(variantsRes.data?.map(v => [v.id, v]) || []);
   const productsMap = new Map(productsRes.data?.map(p => [p.id, p]) || []);
@@ -135,6 +149,8 @@ export async function fetchOrders() {
     store: order.store_id ? storesMap.get(order.store_id) : null,
     delivery_agent: order.delivery_agent_id ? agentsMap.get(order.delivery_agent_id) : null
   }));
+
+  console.log(`✅ fetchOrders: Complete. Sample order items count:`, enrichedOrders[0]?.order_items?.length);
 
   return { data: enrichedOrders, error: null };
 }

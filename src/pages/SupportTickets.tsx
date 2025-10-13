@@ -184,7 +184,10 @@ export default function SupportTickets() {
     try {
       setSubmitting(true);
 
+      const ticketNumber = `TKT-${Date.now().toString().slice(-8)}`;
+
       const ticketData = {
+        ticket_number: ticketNumber,
         customer_id: customerInfo.id,
         order_id: selectedOrder?.id || null,
         subject: ticketForm.subject,
