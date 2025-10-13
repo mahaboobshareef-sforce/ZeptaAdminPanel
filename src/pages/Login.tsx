@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 import { ShoppingBag } from 'lucide-react';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 
@@ -9,6 +10,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { signIn } = useAuth();
+
+  useEffect(() => {
+    supabase.auth.signOut().then(() => {
+      console.log('🔓 Cleared any stale sessions');
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,10 +121,13 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="mt-4 text-sm text-gray-600 bg-gray-50 p-3 rounded">
-              <p><strong>Admin:</strong> admin@zepta.com / admin123</p>
-            <p><strong>Use your real admin credentials from your database</strong></p>
-          </div>
+            <div className="mt-4 text-sm text-gray-600 bg-gray-50 p-4 rounded space-y-2">
+              <p className="font-semibold text-gray-800">Test Credentials:</p>
+              <p><strong>Super Admin:</strong> zeptainternet@gmail.com</p>
+              <p><strong>Super Admin 2:</strong> sandi.tiru@gmail.com</p>
+              <p><strong>Admin:</strong> mshareef.nms@gmail.com</p>
+              <p className="text-xs text-gray-500 mt-2">Password: Ask the system administrator</p>
+            </div>
         </div>
       </div>
     </div>
