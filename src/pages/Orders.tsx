@@ -103,6 +103,13 @@ export default function Orders() {
       }
       
       console.log('✅ Orders loaded:', ordersResult.data?.length || 0);
+      console.log('📊 Sample order data:', {
+        orderId: ordersResult.data?.[0]?.id,
+        itemsCount: ordersResult.data?.[0]?.order_items?.length,
+        firstItem: ordersResult.data?.[0]?.order_items?.[0],
+        hasProduct: !!ordersResult.data?.[0]?.order_items?.[0]?.product,
+        hasVariant: !!ordersResult.data?.[0]?.order_items?.[0]?.variant
+      });
       setOrders(ordersResult.data || []);
       setAgents(agentsResult.data || []);
       setStores(storesResult.data || []);
