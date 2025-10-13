@@ -15,10 +15,6 @@ import { usePermissions } from '../hooks/usePermissions';
 
 export default function ProfitAnalysis() {
   const { can } = usePermissions();
-
-  if (!can('view_profit_analysis')) {
-    return null;
-  }
   const [profitData, setProfitData] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

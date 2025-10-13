@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { usePermissions } from '../hooks/usePermissions';
 
 export default function Refunds() {
-  const { can } = usePermissions();
+  const { can, loading: permissionsLoading } = usePermissions();
   const [refunds, setRefunds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtering, setFiltering] = useState(false);
@@ -52,6 +52,10 @@ export default function Refunds() {
   useEffect(() => {
     loadRefunds();
   }, []);
+
+  if (permissionsLoading) {
+    return null;
+  }
 
   if (!can('manage_refunds')) {
     return null;

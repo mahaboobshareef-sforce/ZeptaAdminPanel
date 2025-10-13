@@ -20,7 +20,7 @@ import { format } from 'date-fns';
 import { usePermissions } from '../hooks/usePermissions';
 
 export default function PurchaseManagement() {
-  const { can } = usePermissions();
+  const { can, loading: permissionsLoading } = usePermissions();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [stores, setStores] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -278,6 +278,10 @@ export default function PurchaseManagement() {
         return [{ value: 'kg', label: 'Kilograms (kg)' }];
     }
   };
+
+  if (permissionsLoading) {
+    return null;
+  }
 
   if (!can('purchase_management')) {
     return null;

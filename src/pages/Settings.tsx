@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 
 export default function Settings() {
   const { profile, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'security' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'system'>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -207,7 +207,6 @@ export default function Settings() {
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'system', label: 'System', icon: Database }
   ];
@@ -336,56 +335,6 @@ export default function Settings() {
                       </Button>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Communication Preferences</h3>
-                    <div className="space-y-4">
-                      {Object.entries(notificationSettings).map(([key, value]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium capitalize">
-                              {key.replace('_', ' ')}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {key === 'email_notifications' && 'Receive notifications via email'}
-                              {key === 'sms_notifications' && 'Receive notifications via SMS'}
-                              {key === 'push_notifications' && 'Receive push notifications'}
-                              {key === 'order_updates' && 'Get updates about order status changes'}
-                              {key === 'marketing_emails' && 'Receive promotional emails and offers'}
-                            </p>
-                          </div>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={value}
-                              onChange={(e) => setNotificationSettings({
-                                ...notificationSettings,
-                                [key]: e.target.checked
-                              })}
-                              className="sr-only peer"
-                            />
-                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Button onClick={saveNotificationSettings} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Preferences'}
-                  </Button>
                 </div>
               </CardContent>
             </Card>

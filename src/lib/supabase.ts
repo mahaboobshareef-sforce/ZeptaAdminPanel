@@ -69,29 +69,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function fetchOrders() {
   const { data, error } = await supabase
     .from('orders')
-    .select('*')
+    .select(`
+      *,
+      customer:users!customer_id(id, full_name, email, mobile_number),
+      store:stores!store_id(id, name),
+      delivery_agent:users!delivery_agent_id(id, full_name)
+    `)
     .order('created_at', { ascending: false });
 
-  if (error) return { data, error };
-
-  const ordersWithRelations = await Promise.all(
-    (data || []).map(async (order) => {
-      const [customer, store, agent] = await Promise.all([
-        order.customer_id ? supabase.from('users').select('id, full_name, email').eq('id', order.customer_id).maybeSingle() : Promise.resolve({ data: null }),
-        order.store_id ? supabase.from('stores').select('id, name').eq('id', order.store_id).maybeSingle() : Promise.resolve({ data: null }),
-        order.delivery_agent_id ? supabase.from('users').select('id, full_name').eq('id', order.delivery_agent_id).maybeSingle() : Promise.resolve({ data: null })
-      ]);
-
-      return {
-        ...order,
-        customer: customer.data,
-        store: store.data,
-        delivery_agent: agent.data
-      };
-    })
-  );
-
-  return { data: ordersWithRelations, error: null };
+  return { data, error };
 }
 
 export async function updateOrderStatus(orderId: string, status: string) {
