@@ -41,7 +41,7 @@ export function useAuth() {
 
         if (session?.user) {
           try {
-            console.log('📊 Fetching user profile...');
+            console.log('📊 Fetching user profile for:', session.user.id, session.user.email);
             // Fetch actual user profile from database
             const { data: userProfile, error } = await supabase
               .from('users')
@@ -49,17 +49,20 @@ export function useAuth() {
               .eq('id', session.user.id)
               .maybeSingle();
 
+            console.log('📊 Profile query result:', { userProfile, error });
+
             if (!isMounted) return;
 
             if (userProfile && !error) {
               console.log('✅ Profile loaded:', userProfile.email, userProfile.role);
               setProfile(userProfile);
             } else {
-              console.error('❌ Profile not found for user:', session.user.id, error);
+              console.error('❌ Profile not found for user:', session.user.id, session.user.email, error);
               setProfile(null);
             }
           } catch (err) {
             console.error('❌ Error fetching profile:', err);
+            setProfile(null);
           }
         }
 
@@ -90,6 +93,7 @@ export function useAuth() {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        console.log('📊 Fetching profile on auth change for:', session.user.id, session.user.email);
         // Fetch actual user profile from database
         const { data: userProfile, error } = await supabase
           .from('users')
@@ -97,13 +101,15 @@ export function useAuth() {
           .eq('id', session.user.id)
           .maybeSingle();
 
+        console.log('📊 Profile query result (auth change):', { userProfile, error });
+
         if (!isMounted) return;
 
         if (userProfile && !error) {
-          console.log('✅ Profile updated:', userProfile.email);
+          console.log('✅ Profile updated:', userProfile.email, userProfile.role);
           setProfile(userProfile);
         } else {
-          console.error('❌ Profile not found on auth change:', session.user.id, error);
+          console.error('❌ Profile not found on auth change:', session.user.id, session.user.email, error);
           setProfile(null);
         }
       } else {
