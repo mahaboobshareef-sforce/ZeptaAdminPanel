@@ -95,49 +95,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    let userInserted = false;
-    let insertError = null;
-    let attempts = 0;
-    const maxAttempts = 5;
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    while (!userInserted && attempts < maxAttempts) {
-      attempts++;
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        mobile_number,
+        store_id: store_id || null,
+      })
+      .eq('id', authData.user.id);
 
-      if (attempts > 1) {
-        await new Promise(resolve => setTimeout(resolve, attempts * 200));
-      }
-
-      const { error } = await supabaseAdmin
-        .from('users')
-        .upsert({
-          id: authData.user.id,
-          email,
-          full_name,
-          mobile_number,
-          role: 'delivery_agent',
-          store_id: store_id || null,
-          is_active: true,
-        }, {
-          onConflict: 'id',
-          ignoreDuplicates: false
-        });
-
-      if (!error) {
-        userInserted = true;
-      } else {
-        insertError = error;
-        console.error(`User insert error (attempt ${attempts}):`, JSON.stringify(error, null, 2));
-      }
-    }
-
-    if (!userInserted && insertError) {
+    if (updateError) {
+      console.error('User update error:', JSON.stringify(updateError, null, 2));
       return new Response(
         JSON.stringify({
-          error: 'Database error creating new user',
-          details: insertError.message || 'Unknown database error',
-          code: insertError.code || 'UNKNOWN',
-          hint: insertError.hint || 'No hint available',
-          fullError: JSON.stringify(insertError)
+          error: 'Database error updating user',
+          details: updateError.message || 'Unknown database error',
+          code: updateError.code || 'UNKNOWN',
+          hint: updateError.hint || 'No hint available',
+          fullError: JSON.stringify(updateError)
         }),
         {
           status: 500,
