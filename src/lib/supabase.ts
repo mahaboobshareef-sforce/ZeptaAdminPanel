@@ -106,16 +106,20 @@ export async function fetchOrders() {
   const variantIds = [...new Set(orderItemsRes.data?.map(item => item.variant_id).filter(Boolean) || [])];
   console.log(`📦 fetchOrders: Found ${variantIds.length} unique variants`);
 
-  const [variantsRes, productsRes] = await Promise.all([
-    variantIds.length > 0
-      ? supabase.from('product_variants').select('*').in('id', variantIds)
-      : Promise.resolve({ data: [], error: null }),
-    variantIds.length > 0
-      ? supabase.from('products').select('*')
-      : Promise.resolve({ data: [], error: null })
-  ]);
+  const variantsRes = variantIds.length > 0
+    ? await supabase.from('product_variants').select('*').in('id', variantIds)
+    : { data: [], error: null };
 
-  console.log(`📦 fetchOrders: Loaded ${variantsRes.data?.length || 0} variants, ${productsRes.data?.length || 0} products`);
+  console.log(`📦 fetchOrders: Loaded ${variantsRes.data?.length || 0} variants`);
+
+  const productIds = [...new Set(variantsRes.data?.map(v => v.product_id).filter(Boolean) || [])];
+  console.log(`📦 fetchOrders: Found ${productIds.length} unique products to load`);
+
+  const productsRes = productIds.length > 0
+    ? await supabase.from('products').select('*').in('id', productIds)
+    : { data: [], error: null };
+
+  console.log(`📦 fetchOrders: Loaded ${productsRes.data?.length || 0} products`);
 
   const variantsMap = new Map(variantsRes.data?.map(v => [v.id, v]) || []);
   const productsMap = new Map(productsRes.data?.map(p => [p.id, p]) || []);
