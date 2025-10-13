@@ -11,10 +11,6 @@ import { usePermissions } from '../hooks/usePermissions';
 
 export default function Refunds() {
   const { can } = usePermissions();
-
-  if (!can('manage_refunds')) {
-    return null;
-  }
   const [refunds, setRefunds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtering, setFiltering] = useState(false);
@@ -24,6 +20,10 @@ export default function Refunds() {
   useEffect(() => {
     loadRefunds();
   }, []);
+
+  if (!can('manage_refunds')) {
+    return null;
+  }
 
   const loadRefunds = async () => {
     try {

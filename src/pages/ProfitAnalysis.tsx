@@ -33,6 +33,10 @@ export default function ProfitAnalysis() {
     loadData();
   }, [storeFilter]);
 
+  if (!can('view_profit_analysis')) {
+    return null;
+  }
+
   const loadData = async () => {
     try {
       setLoading(true);

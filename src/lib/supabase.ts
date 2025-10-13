@@ -554,7 +554,7 @@ export async function fetchBanners() {
   const { data, error } = await supabase
     .from('promotional_banners')
     .select('*')
-    .order('display_order', { ascending: true });
+    .order('sort_order', { ascending: true });
 
   return { data, error };
 }

@@ -11,10 +11,6 @@ import { usePermissions } from '../hooks/usePermissions';
 
 export default function Payments() {
   const { can } = usePermissions();
-
-  if (!can('view_payments')) {
-    return null;
-  }
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtering, setFiltering] = useState(false);
@@ -73,6 +69,10 @@ export default function Payments() {
     failed: XCircle,
     refunded: RefreshCw,
   };
+
+  if (!can('view_payments')) {
+    return null;
+  }
 
   if (loading) {
     return (

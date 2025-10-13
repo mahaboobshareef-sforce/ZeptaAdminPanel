@@ -722,20 +722,21 @@ export default function InventoryAdjustments() {
                 <Select
                   label="Store"
                   value={formData.store_id}
-                  onChange={(value) => {
-                    setFormData({...formData, store_id: value, product_id: ''});
+                  onChange={(e) => {
+                    setFormData({...formData, store_id: e.target.value, product_id: ''});
                     setFormErrors({...formErrors, store_id: '', product_id: ''});
                   }}
                   options={storeOptions}
+                  placeholder="Select store"
                   required
                   error={formErrors.store_id}
                 />
-                
+
                 <Select
                   label="Product"
                   value={formData.product_id}
-                  onChange={(value) => {
-                    setFormData({...formData, product_id: value});
+                  onChange={(e) => {
+                    setFormData({...formData, product_id: e.target.value});
                     setFormErrors({...formErrors, product_id: ''});
                   }}
                   options={formData.store_id ? getAvailableProductOptions() : []}
@@ -936,20 +937,21 @@ export default function InventoryAdjustments() {
                 <Select
                   label="Store"
                   value={formData.store_id}
-                  onChange={(value) => {
-                    setFormData({...formData, store_id: value, product_id: ''});
+                  onChange={(e) => {
+                    setFormData({...formData, store_id: e.target.value, product_id: ''});
                     setFormErrors({...formErrors, store_id: '', product_id: ''});
                   }}
                   options={storeOptions}
+                  placeholder="Select store"
                   required
                   error={formErrors.store_id}
                 />
-                
+
                 <Select
                   label="Product"
                   value={formData.product_id}
-                  onChange={(value) => {
-                    setFormData({...formData, product_id: value});
+                  onChange={(e) => {
+                    setFormData({...formData, product_id: e.target.value});
                     setFormErrors({...formErrors, product_id: ''});
                   }}
                   options={formData.store_id ? getAvailableProductOptions() : []}
