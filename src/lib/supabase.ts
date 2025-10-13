@@ -129,10 +129,21 @@ export async function fetchOrders() {
     const product = variant ? productsMap.get(variant.product_id) : null;
     return {
       ...item,
-      variant,
+      variant: variant ? {
+        ...variant,
+        product
+      } : null,
       product
     };
   }) || [];
+
+  console.log(`📦 fetchOrders: Enriched ${enrichedOrderItems.length} order items`);
+  console.log(`📦 fetchOrders: Sample enriched item:`, {
+    hasVariant: !!enrichedOrderItems[0]?.variant,
+    hasProduct: !!enrichedOrderItems[0]?.product,
+    productName: enrichedOrderItems[0]?.product?.name,
+    variantLabel: enrichedOrderItems[0]?.variant?.unit_label
+  });
 
   const orderItemsMap = new Map();
   enrichedOrderItems.forEach(item => {
@@ -141,6 +152,8 @@ export async function fetchOrders() {
     }
     orderItemsMap.get(item.order_id).push(item);
   });
+
+  console.log(`📦 fetchOrders: orderItemsMap has ${orderItemsMap.size} orders with items`);
 
   const customersMap = new Map(customersRes.data?.map(c => [c.id, c]) || []);
   const storesMap = new Map(storesRes.data?.map(s => [s.id, s]) || []);
@@ -155,6 +168,7 @@ export async function fetchOrders() {
   }));
 
   console.log(`✅ fetchOrders: Complete. Sample order items count:`, enrichedOrders[0]?.order_items?.length);
+  console.log(`✅ fetchOrders: Total orders with items:`, enrichedOrders.filter(o => o.order_items.length > 0).length);
 
   return { data: enrichedOrders, error: null };
 }
