@@ -28,7 +28,6 @@ Deno.serve(async (req: Request) => {
 
     const { full_name, email, mobile_number, store_id } = await req.json();
 
-    // Validate required fields
     if (!full_name || !email || !mobile_number) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
@@ -39,7 +38,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check if user already exists
     const { data: existingPublicUser } = await supabaseAdmin
       .from('users')
       .select('id, email, role')
@@ -58,10 +56,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Generate secure random password
     const tempPassword = `Agent${Math.random().toString(36).slice(-8)}@${Date.now().toString(36)}`;
 
-    // Create auth user (trigger will create user record automatically)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: tempPassword,
@@ -96,24 +92,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Wait a moment for trigger to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Update mobile_number and store_id (trigger creates basic user record)
-    const { error: updateError } = await supabaseAdmin
+    const { error: insertError } = await supabaseAdmin
       .from('users')
-      .update({
+      .upsert({
+        id: authData.user.id,
+        email,
+        full_name,
         mobile_number,
+        role: 'delivery_agent',
         store_id: store_id || null,
-      })
-      .eq('id', authData.user.id);
+        is_active: true,
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      });
 
-    if (updateError) {
-      console.error('User update error:', updateError);
+    if (insertError) {
+      console.error('User insert error:', insertError);
       return new Response(
         JSON.stringify({
           error: 'Database error creating new user',
-          details: updateError.message
+          details: insertError.message,
+          code: insertError.code
         }),
         {
           status: 500,
@@ -122,7 +122,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Send password reset email (invitation)
     const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email,
@@ -135,7 +134,6 @@ Deno.serve(async (req: Request) => {
       console.error('Failed to send invitation email:', resetError);
     }
 
-    // Fetch the created user
     const { data: userData } = await supabaseAdmin
       .from('users')
       .select('*')
