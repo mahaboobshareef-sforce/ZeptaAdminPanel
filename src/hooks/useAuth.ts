@@ -84,7 +84,7 @@ export function useAuth() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
 
       console.log('🔄 Auth state changed:', event);
@@ -93,25 +93,31 @@ export function useAuth() {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        console.log('📊 Fetching profile on auth change for:', session.user.id, session.user.email);
-        // Fetch actual user profile from database
-        const { data: userProfile, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
+        (async () => {
+          console.log('📊 Fetching profile on auth change for:', session.user.id, session.user.email);
+          try {
+            const { data: userProfile, error } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .maybeSingle();
 
-        console.log('📊 Profile query result (auth change):', { userProfile, error });
+            console.log('📊 Profile query result (auth change):', { userProfile, error });
 
-        if (!isMounted) return;
+            if (!isMounted) return;
 
-        if (userProfile && !error) {
-          console.log('✅ Profile updated:', userProfile.email, userProfile.role);
-          setProfile(userProfile);
-        } else {
-          console.error('❌ Profile not found on auth change:', session.user.id, session.user.email, error);
-          setProfile(null);
-        }
+            if (userProfile && !error) {
+              console.log('✅ Profile updated:', userProfile.email, userProfile.role);
+              setProfile(userProfile);
+            } else {
+              console.error('❌ Profile not found on auth change:', session.user.id, session.user.email, error);
+              setProfile(null);
+            }
+          } catch (err) {
+            console.error('❌ Profile fetch error:', err);
+            setProfile(null);
+          }
+        })();
       } else {
         setProfile(null);
       }
