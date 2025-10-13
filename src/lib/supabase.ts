@@ -739,15 +739,100 @@ export async function deleteDeliveryAgent(agentId: string) {
 }
 
 export async function getProfitAnalysis(storeId?: string) {
-  let query = supabase.from('sales_cost_allocation').select('*');
+  try {
+    const { data: purchaseData, error: purchaseError } = await supabase
+      .from('purchase_records')
+      .select(`
+        *,
+        product:products!inner(id, name),
+        store:stores!inner(id, name)
+      `);
 
-  if (storeId) {
-    query = query.eq('store_id', storeId);
+    if (purchaseError) throw purchaseError;
+
+    const { data: inventoryData, error: inventoryError } = await supabase
+      .from('bulk_inventory')
+      .select('*');
+
+    if (inventoryError) throw inventoryError;
+
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items:order_items(*)
+      `)
+      .eq('status', 'delivered');
+
+    if (ordersError) throw ordersError;
+
+    const profitMap = new Map();
+
+    purchaseData?.forEach((purchase: any) => {
+      const key = `${purchase.product_id}_${purchase.store_id}`;
+      if (!profitMap.has(key)) {
+        profitMap.set(key, {
+          product_id: purchase.product_id,
+          product_name: purchase.product?.name || 'Unknown',
+          store_id: purchase.store_id,
+          store_name: purchase.store?.name || 'Unknown',
+          total_purchased: 0,
+          total_purchase_cost: 0,
+          total_sold: 0,
+          total_revenue: 0,
+          current_stock: 0,
+          current_stock_value: 0,
+          total_loss_value: 0,
+          net_profit: 0,
+          net_profit_margin_percent: 0
+        });
+      }
+      const record = profitMap.get(key);
+      record.total_purchased += purchase.quantity || 0;
+      record.total_purchase_cost += purchase.total_cost || 0;
+    });
+
+    inventoryData?.forEach((inv: any) => {
+      const key = `${inv.product_id}_${inv.store_id}`;
+      if (profitMap.has(key)) {
+        const record = profitMap.get(key);
+        record.current_stock = inv.total_quantity || 0;
+        record.current_stock_value = (inv.total_quantity || 0) * (record.total_purchase_cost / Math.max(record.total_purchased, 1));
+      }
+    });
+
+    ordersData?.forEach((order: any) => {
+      order.order_items?.forEach((item: any) => {
+        const productId = item.variant_id;
+        const storeId = order.store_id;
+        const key = `${productId}_${storeId}`;
+
+        if (profitMap.has(key)) {
+          const record = profitMap.get(key);
+          record.total_sold += item.quantity || 0;
+          record.total_revenue += (item.price * item.quantity) || 0;
+        }
+      });
+    });
+
+    profitMap.forEach((record) => {
+      record.net_profit = record.total_revenue - record.total_purchase_cost;
+      record.net_profit_margin_percent = record.total_revenue > 0
+        ? (record.net_profit / record.total_revenue) * 100
+        : 0;
+    });
+
+    let results = Array.from(profitMap.values());
+
+    if (storeId && storeId !== 'all') {
+      results = results.filter(r => r.store_id === storeId);
+    }
+
+    return { data: results, error: null };
+  } catch (error: any) {
+    console.error('Profit analysis error:', error);
+    return { data: [], error };
   }
-
-  const { data, error } = await query.order('created_at', { ascending: false });
-
-  return { data, error };
 }
 
 export async function getProductProfitDetails(productId: string, storeId?: string) {
