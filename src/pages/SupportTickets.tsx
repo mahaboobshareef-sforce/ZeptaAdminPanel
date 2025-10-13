@@ -14,19 +14,22 @@ import toast from 'react-hot-toast';
 import { usePermissions } from '../hooks/usePermissions';
 
 const priorityOptions = [
-  { value: 'low', label: 'Low Priority' },
-  { value: 'medium', label: 'Medium Priority' },
-  { value: 'high', label: 'High Priority' },
-  { value: 'urgent', label: 'Urgent' }
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'critical', label: 'Critical' }
 ];
 
-const categoryOptions = [
-  { value: 'order_issue', label: 'Order Issue' },
+const issueTypeOptions = [
+  { value: 'damaged_product', label: 'Damaged Product' },
+  { value: 'spoiled_product', label: 'Spoiled Product' },
+  { value: 'missing_items', label: 'Missing Items' },
+  { value: 'wrong_items', label: 'Wrong Items' },
   { value: 'delivery_issue', label: 'Delivery Issue' },
-  { value: 'product_quality', label: 'Product Quality' },
-  { value: 'payment_issue', label: 'Payment Issue' },
-  { value: 'refund_request', label: 'Refund Request' },
-  { value: 'general_inquiry', label: 'General Inquiry' },
+  { value: 'quality_issue', label: 'Quality Issue' },
+  { value: 'quantity_mismatch', label: 'Quantity Mismatch' },
+  { value: 'packaging_issue', label: 'Packaging Issue' },
+  { value: 'late_delivery', label: 'Late Delivery' },
   { value: 'other', label: 'Other' }
 ];
 
@@ -55,7 +58,7 @@ export default function SupportTickets() {
 
   const [ticketForm, setTicketForm] = useState({
     subject: '',
-    category: 'order_issue',
+    issue_type: 'delivery_issue',
     priority: 'medium',
     description: ''
   });
@@ -69,15 +72,35 @@ export default function SupportTickets() {
       setLoading(true);
       const { data, error } = await supabase
         .from('support_tickets')
-        .select(`
-          *,
-          customer:users!customer_id(full_name, email, mobile_number),
-          order:orders!order_id(order_number, order_total, status)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTickets(data || []);
+
+      if (data && data.length > 0) {
+        const customerIds = [...new Set(data.map(t => t.customer_id))];
+        const orderIds = [...new Set(data.map(t => t.order_id).filter(Boolean))];
+
+        const [customersRes, ordersRes] = await Promise.all([
+          supabase.from('users').select('id, full_name, email, mobile_number').in('id', customerIds),
+          orderIds.length > 0
+            ? supabase.from('orders').select('id, order_number, order_total, status').in('id', orderIds)
+            : Promise.resolve({ data: [], error: null })
+        ]);
+
+        const customersMap = new Map(customersRes.data?.map(c => [c.id, c]) || []);
+        const ordersMap = new Map(ordersRes.data?.map(o => [o.id, o]) || []);
+
+        const enrichedData = data.map(ticket => ({
+          ...ticket,
+          customer: customersMap.get(ticket.customer_id),
+          order: ticket.order_id ? ordersMap.get(ticket.order_id) : null
+        }));
+
+        setTickets(enrichedData);
+      } else {
+        setTickets([]);
+      }
     } catch (err) {
       console.error('Error loading tickets:', err);
       toast.error('Failed to load support tickets');
@@ -115,12 +138,10 @@ export default function SupportTickets() {
 
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          store:stores!store_id(name)
-        `)
+        .select('*')
         .eq('customer_id', userData.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (ordersError) throw ordersError;
 
@@ -166,11 +187,10 @@ export default function SupportTickets() {
         customer_id: customerInfo.id,
         order_id: selectedOrder?.id || null,
         subject: ticketForm.subject,
-        category: ticketForm.category,
+        issue_type: ticketForm.issue_type,
         priority: ticketForm.priority,
         description: ticketForm.description,
-        status: 'open',
-        issue_type: ticketForm.category
+        status: 'open'
       };
 
       const { data, error } = await supabase
@@ -201,7 +221,7 @@ export default function SupportTickets() {
     setSelectedOrder(null);
     setTicketForm({
       subject: '',
-      category: 'order_issue',
+      issue_type: 'delivery_issue',
       priority: 'medium',
       description: ''
     });
@@ -394,40 +414,52 @@ export default function SupportTickets() {
             )}
 
             {/* Step 2: Select Order (Optional) */}
-            {customerOrders.length > 0 && (
+            {customerInfo && (
               <div>
                 <h3 className="text-lg font-medium mb-4">2. Select Order (Optional)</h3>
-                <div className="max-h-48 overflow-y-auto border rounded-lg">
-                  {customerOrders.map((order) => (
-                    <div
-                      key={order.id}
-                      onClick={() => selectOrder(order)}
-                      className={`p-3 border-b cursor-pointer hover:bg-gray-50 ${
-                        selectedOrder?.id === order.id ? 'bg-blue-50 border-blue-500' : ''
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium">Order #{order.order_number}</p>
-                          <p className="text-sm text-gray-500">
-                            {format(new Date(order.created_at), 'MMM dd, yyyy')} • ₹{order.order_total}
-                          </p>
+                {customerOrders.length === 0 ? (
+                  <div className="border rounded-lg p-6 text-center text-gray-500">
+                    <Package className="mx-auto h-8 w-8 mb-2 text-gray-400" />
+                    <p>No orders found for this customer</p>
+                    <p className="text-sm">You can still create a general support ticket</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="max-h-48 overflow-y-auto border rounded-lg">
+                      {customerOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          onClick={() => selectOrder(order)}
+                          className={`p-3 border-b last:border-b-0 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            selectedOrder?.id === order.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-medium">Order #{order.order_number}</p>
+                              <p className="text-sm text-gray-500">
+                                {format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')} • ₹{order.order_total}
+                              </p>
+                            </div>
+                            <Badge variant={selectedOrder?.id === order.id ? 'success' : 'default'}>
+                              {order.status}
+                            </Badge>
+                          </div>
                         </div>
-                        <Badge variant={selectedOrder?.id === order.id ? 'success' : 'default'}>
-                          {order.status}
-                        </Badge>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => setSelectedOrder(null)}
-                >
-                  Clear Selection (General Ticket)
-                </Button>
+                    {selectedOrder && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => setSelectedOrder(null)}
+                      >
+                        Clear Selection (General Ticket)
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -444,10 +476,10 @@ export default function SupportTickets() {
                   />
 
                   <Select
-                    label="Category"
-                    value={ticketForm.category}
-                    onChange={(e) => setTicketForm({ ...ticketForm, category: e.target.value })}
-                    options={categoryOptions}
+                    label="Issue Type"
+                    value={ticketForm.issue_type}
+                    onChange={(e) => setTicketForm({ ...ticketForm, issue_type: e.target.value })}
+                    options={issueTypeOptions}
                   />
 
                   <Select
