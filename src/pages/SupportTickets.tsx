@@ -41,6 +41,7 @@ const statusOptions = [
   { value: 'closed', label: 'Closed' }
 ];
 
+// Support Tickets with Edit functionality
 export default function SupportTickets() {
   const { can, loading: permissionsLoading } = usePermissions();
   const [tickets, setTickets] = useState<any[]>([]);
