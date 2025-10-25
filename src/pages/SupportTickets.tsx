@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Plus, Search, Phone, User, Mail, Package, X } from 'lucide-react';
+import { MessageSquare, Plus, Search, Phone, User, Mail, Package, X, Edit2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/UI/Card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/UI/Table';
 import Badge from '../components/UI/Badge';
@@ -61,6 +61,18 @@ export default function SupportTickets() {
     issue_type: 'delivery_issue',
     priority: 'medium',
     description: ''
+  });
+
+  // Edit ticket modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTicket, setEditingTicket] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    subject: '',
+    issue_type: '',
+    priority: '',
+    status: '',
+    description: '',
+    admin_notes: ''
   });
 
   useEffect(() => {
@@ -231,6 +243,58 @@ export default function SupportTickets() {
     });
   };
 
+  const openEditModal = (ticket: any) => {
+    setEditingTicket(ticket);
+    setEditForm({
+      subject: ticket.subject || '',
+      issue_type: ticket.issue_type || 'other',
+      priority: ticket.priority || 'medium',
+      status: ticket.status || 'open',
+      description: ticket.description || '',
+      admin_notes: ticket.admin_notes || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const updateTicket = async () => {
+    if (!editingTicket) return;
+
+    if (!editForm.subject || !editForm.description) {
+      toast.error('Please fill in subject and description');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({
+          subject: editForm.subject,
+          issue_type: editForm.issue_type,
+          priority: editForm.priority,
+          status: editForm.status,
+          description: editForm.description,
+          admin_notes: editForm.admin_notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingTicket.id);
+
+      if (error) throw error;
+
+      toast.success('Ticket updated successfully!');
+      setShowEditModal(false);
+      setEditingTicket(null);
+      loadTickets();
+
+    } catch (err) {
+      console.error('Failed to update ticket:', err);
+      toast.error('Failed to update ticket');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'open': return 'warning';
@@ -322,6 +386,7 @@ export default function SupportTickets() {
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -352,6 +417,15 @@ export default function SupportTickets() {
                     </TableCell>
                     <TableCell>
                       {format(new Date(ticket.created_at), 'MMM dd, yyyy')}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditModal(ticket)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -526,6 +600,126 @@ export default function SupportTickets() {
             disabled={submitting || !customerInfo || !ticketForm.subject || !ticketForm.description}
           >
             {submitting ? 'Creating...' : 'Create Ticket'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Edit Ticket Modal */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingTicket(null);
+        }}
+        title="Edit Support Ticket"
+      >
+        <ModalBody>
+          <div className="space-y-4">
+            {/* Ticket Info */}
+            {editingTicket && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Ticket Number</p>
+                    <p className="font-medium">{editingTicket.ticket_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Customer</p>
+                    <p className="font-medium">{editingTicket.customer?.full_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Email</p>
+                    <p className="font-medium">{editingTicket.customer?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Created</p>
+                    <p className="font-medium">
+                      {format(new Date(editingTicket.created_at), 'MMM dd, yyyy HH:mm')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Form */}
+            <Input
+              label="Subject *"
+              placeholder="Brief description of the issue"
+              value={editForm.subject}
+              onChange={(value) => setEditForm({ ...editForm, subject: value })}
+            />
+
+            <Select
+              label="Issue Type"
+              value={editForm.issue_type}
+              onChange={(e) => setEditForm({ ...editForm, issue_type: e.target.value })}
+              options={issueTypeOptions}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Priority"
+                value={editForm.priority}
+                onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
+                options={priorityOptions}
+              />
+
+              <Select
+                label="Status"
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                options={[
+                  { value: 'open', label: 'Open' },
+                  { value: 'in_progress', label: 'In Progress' },
+                  { value: 'resolved', label: 'Resolved' },
+                  { value: 'closed', label: 'Closed' }
+                ]}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description *
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={4}
+                placeholder="Detailed description of the issue..."
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Admin Notes (Internal)
+              </label>
+              <textarea
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="Internal notes for admin reference (not visible to customer)..."
+                value={editForm.admin_notes}
+                onChange={(e) => setEditForm({ ...editForm, admin_notes: e.target.value })}
+              />
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowEditModal(false);
+              setEditingTicket(null);
+            }}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={updateTicket}
+            disabled={submitting || !editForm.subject || !editForm.description}
+          >
+            {submitting ? 'Updating...' : 'Update Ticket'}
           </Button>
         </ModalFooter>
       </Modal>
