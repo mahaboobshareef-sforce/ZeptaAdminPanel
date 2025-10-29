@@ -67,19 +67,45 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function fetchOrders() {
-  console.log('📦 fetchOrders: Starting...');
+  console.log('📦 [Bolt] fetchOrders: Starting...');
+
+  // First check auth state
+  const { data: { user } } = await supabase.auth.getUser();
+  console.log('👤 [Bolt] Current user:', user?.id, user?.email);
 
   const { data: orders, error } = await supabase
     .from('orders')
     .select('*')
     .order('created_at', { ascending: false });
 
-  if (error || !orders) {
-    console.error('❌ fetchOrders: Failed to load orders', error);
+  if (error) {
+    console.error('❌ [Bolt] fetchOrders: RLS ERROR', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error details:', error.details);
+    console.error('❌ Error hint:', error.hint);
+
+    if (error.message?.toLowerCase().includes('row level security') ||
+        error.message?.toLowerCase().includes('rls') ||
+        error.code === '42501') {
+      return {
+        data: null,
+        error: {
+          ...error,
+          message: 'RLS Policy Error: Not authorized to view orders. Please ensure you are logged in as admin/super_admin and that is_staff() function is working correctly.'
+        }
+      };
+    }
+
     return { data: orders, error };
   }
 
-  console.log(`📦 fetchOrders: Loaded ${orders.length} orders`);
+  if (!orders) {
+    console.warn('⚠️ [Bolt] fetchOrders: No data returned (but no error)');
+    return { data: [], error: null };
+  }
+
+  console.log(`✅ [Bolt] fetchOrders: Loaded ${orders.length} orders`);
 
   const orderIds = orders.map(o => o.id);
   const customerIds = [...new Set(orders.map(o => o.customer_id))];

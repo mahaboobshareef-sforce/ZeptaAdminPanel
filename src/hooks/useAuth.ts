@@ -16,7 +16,7 @@ export function useAuth() {
     // Add timeout protection
     timeoutId = setTimeout(() => {
       if (isMounted && loading) {
-        console.warn('Auth loading timeout - forcing completion');
+        console.warn('⏰ Auth loading timeout - forcing completion');
         setLoading(false);
       }
     }, 10000); // 10 second timeout
@@ -24,40 +24,64 @@ export function useAuth() {
     // Get initial session
     const initAuth = async () => {
       try {
-        console.log('🔐 Initializing auth...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('🔐 [Bolt Dashboard] Initializing auth...');
 
-        if (sessionError) {
-          console.error('❌ Session error:', sessionError);
+        // Use getUser() instead of getSession() for fresh auth state
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+
+        if (userError) {
+          console.error('❌ Auth user error:', userError);
           if (isMounted) setLoading(false);
           return;
         }
 
+        // Also get session for token
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError);
+        }
+
         if (!isMounted) return;
 
-        console.log('👤 Session:', session ? 'Found' : 'Not found');
-        setSession(session);
-        setUser(session?.user ?? null);
+        console.log('👤 Bolt user id:', authUser?.id);
+        console.log('📧 Bolt user email:', authUser?.email);
+        console.log('🎟️  Session exists:', !!session);
 
-        if (session?.user) {
+        setSession(session);
+        setUser(authUser ?? null);
+
+        if (authUser) {
           try {
-            console.log('📊 Fetching user profile for:', session.user.id, session.user.email);
+            console.log('📊 Fetching user profile from public.users...');
+            console.log('🔍 Query: SELECT * FROM users WHERE id =', authUser.id);
+
             // Fetch actual user profile from database
             const { data: userProfile, error } = await supabase
               .from('users')
               .select('*')
-              .eq('id', session.user.id)
+              .eq('id', authUser.id)
               .maybeSingle();
 
-            console.log('📊 Profile query result:', { userProfile, error });
+            console.log('📊 Profile query result:', {
+              found: !!userProfile,
+              role: userProfile?.role,
+              error: error?.message
+            });
 
             if (!isMounted) return;
 
             if (userProfile && !error) {
-              console.log('✅ Profile loaded:', userProfile.email, userProfile.role);
+              console.log('✅ Profile loaded successfully!');
+              console.log('   - Email:', userProfile.email);
+              console.log('   - Role:', userProfile.role);
+              console.log('   - Active:', userProfile.is_active);
               setProfile(userProfile);
             } else {
-              console.error('❌ Profile not found for user:', session.user.id, session.user.email, error);
+              console.error('❌ Profile not found or RLS blocked access');
+              console.error('   - User ID:', authUser.id);
+              console.error('   - Error:', error);
+              console.error('   - This means is_staff() or RLS policy is blocking SELECT');
               setProfile(null);
             }
           } catch (err) {
@@ -133,10 +157,23 @@ export function useAuth() {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    console.log('🔐 [Bolt] Attempting sign in...');
+    console.log('📧 Email:', email);
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    if (error) {
+      console.error('❌ Sign in failed:', error.message);
+      return { data, error };
+    }
+
+    console.log('✅ Sign in successful!');
+    console.log('👤 User ID:', data.user?.id);
+    console.log('📧 User email:', data.user?.email);
+
     return { data, error };
   };
 
@@ -148,6 +185,9 @@ export function useAuth() {
     return { error };
   };
 
+  const isStaff = profile?.role === 'admin' || profile?.role === 'super_admin';
+  const isSuperAdmin = profile?.role === 'super_admin';
+
   return {
     user,
     session,
@@ -155,6 +195,8 @@ export function useAuth() {
     loading,
     signIn,
     signOut,
-    isAdmin: true,
+    isAdmin: isStaff, // For backward compatibility
+    isStaff,
+    isSuperAdmin,
   };
 }
